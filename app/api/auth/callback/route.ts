@@ -25,13 +25,14 @@ export async function GET(req: NextRequest) {
     const expiresAt = Date.now() + tokens.expires_in * 1000;
     const prod = process.env.NODE_ENV === 'production';
 
-    // Return a real 200 response so the browser stores Set-Cookie headers
-    // before navigating. Redirects with Set-Cookie can be dropped in some
-    // browser/Next.js combinations.
     const response = new NextResponse(
       `<!doctype html><html><head>
         <meta http-equiv="refresh" content="0;url=/dashboard">
-      </head><body>Redirecting…</body></html>`,
+        <style>body{font-family:sans-serif;background:#0a0a0a;color:#ccc;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}</style>
+      </head><body>
+        <p>✅ Authenticated — redirecting to dashboard…</p>
+        <script>setTimeout(()=>window.location.replace('/dashboard'),100)</script>
+      </body></html>`,
       { status: 200, headers: { 'Content-Type': 'text/html' } }
     );
 
