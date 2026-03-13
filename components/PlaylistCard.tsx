@@ -38,7 +38,7 @@ export default function PlaylistCard({ playlist, onSelect, isSelected, isLoading
           {playlist.name}
         </p>
         <p className={`text-xs truncate mt-0.5 ${isSelected ? 'text-green-200' : 'text-gray-400'}`}>
-          {playlist.tracks.total} tracks • {playlist.owner.display_name}
+          {playlist.tracks?.total ?? 0} tracks{playlist.owner?.display_name ? ` • ${playlist.owner.display_name}` : ''}
         </p>
         {playlist.description && (
           <p className={`text-xs truncate mt-0.5 ${isSelected ? 'text-green-100' : 'text-gray-500'}`}
