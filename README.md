@@ -25,7 +25,8 @@ Generate personalized indoor cycling workouts from your Spotify playlists. SpinS
 
 1. Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
 2. Create a new app
-3. Add `http://localhost:3000/api/auth/callback` as a Redirect URI
+3. Add `http://127.0.0.1:3000/api/auth/callback` as a Redirect URI
+   > Spotify's dashboard rejects `localhost` — use `127.0.0.1` instead
 4. Copy your **Client ID** and **Client Secret**
 
 ### 2. Configure Environment
@@ -35,7 +36,7 @@ Create a `.env.local` file in the project root:
 ```env
 SPOTIFY_CLIENT_ID=your_spotify_client_id
 SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
-NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_URL=http://127.0.0.1:3000
 NEXTAUTH_SECRET=any_random_secret_string
 ```
 
