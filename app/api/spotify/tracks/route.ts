@@ -19,7 +19,8 @@ export async function GET(req: NextRequest) {
     const data = await getPlaylistTracks(token, playlistId, 50, 0);
     return NextResponse.json(data);
   } catch (err) {
-    console.error('Tracks error:', err);
-    return NextResponse.json({ error: 'Failed to fetch tracks' }, { status: 500 });
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('Tracks error:', msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

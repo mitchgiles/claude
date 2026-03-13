@@ -53,7 +53,10 @@ export default function DashboardPage() {
     try {
       // 1. Fetch tracks
       const tracksRes = await fetch(`/api/spotify/tracks?playlistId=${playlist.id}`);
-      if (!tracksRes.ok) throw new Error('Failed to fetch tracks');
+      if (!tracksRes.ok) {
+        const errData = await tracksRes.json().catch(() => ({}));
+        throw new Error(errData.error || `Failed to fetch tracks (${tracksRes.status})`);
+      }
       const tracksData = await tracksRes.json();
 
       const tracks: SpotifyTrack[] = tracksData.items
