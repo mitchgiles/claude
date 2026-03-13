@@ -85,6 +85,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   auth_failed: 'Authentication failed. Please try again.',
   no_code: 'No authorization code received from Spotify.',
   access_denied: 'Spotify access was denied. Please allow access to continue.',
+  session_expired: 'Your session expired. Please connect Spotify again.',
 };
 
 async function AuthError({ searchParams }: { searchParams: Promise<{ error?: string; detail?: string }> }) {

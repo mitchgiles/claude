@@ -1,6 +1,14 @@
 import { exchangeCodeForTokens } from '@/lib/spotify';
 import { NextRequest, NextResponse } from 'next/server';
 
+const COOKIE_OPTS = (maxAge: number, prod: boolean) => ({
+  httpOnly: true,
+  secure: prod,
+  sameSite: 'lax' as const,
+  path: '/',
+  maxAge,
+});
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const code = searchParams.get('code');
@@ -15,28 +23,21 @@ export async function GET(req: NextRequest) {
   try {
     const tokens = await exchangeCodeForTokens(code);
     const expiresAt = Date.now() + tokens.expires_in * 1000;
+    const prod = process.env.NODE_ENV === 'production';
 
-    const response = NextResponse.redirect(new URL('/dashboard', req.url));
+    // Return a real 200 response so the browser stores Set-Cookie headers
+    // before navigating. Redirects with Set-Cookie can be dropped in some
+    // browser/Next.js combinations.
+    const response = new NextResponse(
+      `<!doctype html><html><head>
+        <meta http-equiv="refresh" content="0;url=/dashboard">
+      </head><body>Redirecting…</body></html>`,
+      { status: 200, headers: { 'Content-Type': 'text/html' } }
+    );
 
-    // Store tokens in HTTP-only cookies
-    response.cookies.set('spotify_access_token', tokens.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: tokens.expires_in,
-      path: '/',
-    });
-    response.cookies.set('spotify_refresh_token', tokens.refresh_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 60 * 60 * 24 * 30, // 30 days
-      path: '/',
-    });
-    response.cookies.set('spotify_expires_at', String(expiresAt), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 60 * 60 * 24 * 30,
-      path: '/',
-    });
+    response.cookies.set('spotify_access_token', tokens.access_token, COOKIE_OPTS(tokens.expires_in, prod));
+    response.cookies.set('spotify_refresh_token', tokens.refresh_token, COOKIE_OPTS(60 * 60 * 24 * 30, prod));
+    response.cookies.set('spotify_expires_at', String(expiresAt), COOKIE_OPTS(60 * 60 * 24 * 30, prod));
 
     return response;
   } catch (err) {

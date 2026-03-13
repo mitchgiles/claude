@@ -22,7 +22,7 @@ export default function DashboardPage() {
     try {
       const res = await fetch(`/api/spotify/playlists?limit=${LIMIT}&offset=${newOffset}`);
       if (res.status === 401) {
-        window.location.href = '/';
+        window.location.href = '/?error=session_expired';
         return;
       }
       const data = await res.json();
