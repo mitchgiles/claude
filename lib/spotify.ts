@@ -13,7 +13,7 @@ export function getAuthUrl(): string {
   const params = new URLSearchParams({
     client_id: process.env.SPOTIFY_CLIENT_ID!,
     response_type: 'code',
-    redirect_uri: `${process.env.NEXTAUTH_URL}/api/auth/callback`,
+    redirect_uri: process.env.SPOTIFY_REDIRECT_URI!,
     scope: SCOPES,
     show_dialog: 'true',
   });
@@ -38,7 +38,7 @@ export async function exchangeCodeForTokens(code: string): Promise<{
     body: new URLSearchParams({
       grant_type: 'authorization_code',
       code,
-      redirect_uri: `${process.env.NEXTAUTH_URL}/api/auth/callback`,
+      redirect_uri: process.env.SPOTIFY_REDIRECT_URI!,
     }),
   });
 

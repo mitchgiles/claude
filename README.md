@@ -38,7 +38,10 @@ SPOTIFY_CLIENT_ID=your_spotify_client_id
 SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
 NEXTAUTH_URL=http://127.0.0.1:3000
 NEXTAUTH_SECRET=any_random_secret_string
+SPOTIFY_REDIRECT_URI=http://127.0.0.1:3000/api/auth/callback
 ```
+
+> For Vercel, set `NEXTAUTH_URL` to your deployment URL and `SPOTIFY_REDIRECT_URI` to `https://your-app.vercel.app/api/auth/callback`. The value must exactly match what is registered in the Spotify dashboard.
 
 ### 3. Install and Run
 
