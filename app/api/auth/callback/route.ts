@@ -40,7 +40,11 @@ export async function GET(req: NextRequest) {
 
     return response;
   } catch (err) {
-    console.error('Auth callback error:', err);
-    return NextResponse.redirect(new URL('/?error=auth_failed', req.url));
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('Auth callback error:', msg);
+    const url = new URL('/', req.url);
+    url.searchParams.set('error', 'auth_failed');
+    url.searchParams.set('detail', msg);
+    return NextResponse.redirect(url);
   }
 }

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-export default function HomePage() {
+export default function HomePage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col">
       {/* Hero */}
@@ -15,6 +15,9 @@ export default function HomePage() {
             <p className="text-green-400 text-sm font-medium">Spotify Spin Class Generator</p>
           </div>
         </div>
+
+        {/* Auth error */}
+        <AuthError searchParams={searchParams} />
 
         {/* Tagline */}
         <h2 className="text-3xl md:text-5xl font-bold text-white max-w-2xl leading-tight mb-4">
@@ -74,6 +77,24 @@ export default function HomePage() {
       <footer className="py-6 text-center text-gray-600 text-sm border-t border-gray-900">
         SpinSync is not affiliated with Spotify. Uses the Spotify Web API.
       </footer>
+    </div>
+  );
+}
+
+const ERROR_MESSAGES: Record<string, string> = {
+  auth_failed: 'Authentication failed. Please try again.',
+  no_code: 'No authorization code received from Spotify.',
+  access_denied: 'Spotify access was denied. Please allow access to continue.',
+};
+
+async function AuthError({ searchParams }: { searchParams: Promise<{ error?: string; detail?: string }> }) {
+  const { error, detail } = await searchParams;
+  if (!error) return null;
+  const message = ERROR_MESSAGES[error] ?? `Authentication error: ${error}`;
+  return (
+    <div className="mb-6 px-4 py-3 bg-red-900/40 border border-red-700 rounded-xl text-red-300 text-sm max-w-md text-left">
+      <p className="font-semibold">{message}</p>
+      {detail && <p className="mt-1 text-red-400/70 font-mono text-xs break-all">{detail}</p>}
     </div>
   );
 }
