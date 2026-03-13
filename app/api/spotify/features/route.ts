@@ -33,7 +33,8 @@ export async function GET(req: NextRequest) {
     const audio_features = results.flatMap((r) => r.audio_features);
     return NextResponse.json({ audio_features });
   } catch (err) {
-    console.error('Features error:', err);
-    return NextResponse.json({ error: 'Failed to fetch audio features' }, { status: 500 });
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('Features error:', msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

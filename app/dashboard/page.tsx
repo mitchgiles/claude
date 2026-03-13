@@ -68,7 +68,10 @@ export default function DashboardPage() {
       // 2. Fetch audio features
       const ids = tracks.map((t) => t.id).join(',');
       const featuresRes = await fetch(`/api/spotify/features?ids=${ids}`);
-      if (!featuresRes.ok) throw new Error('Failed to fetch audio features');
+      if (!featuresRes.ok) {
+        const errData = await featuresRes.json().catch(() => ({}));
+        throw new Error(errData.error || `Failed to fetch audio features (${featuresRes.status})`);
+      }
       const featuresData = await featuresRes.json();
 
       const featuresMap = new Map<string, AudioFeatures>(
