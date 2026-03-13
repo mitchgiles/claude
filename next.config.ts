@@ -1,0 +1,22 @@
+import type { NextConfig } from 'next';
+
+const nextConfig: NextConfig = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'i.scdn.co', // Spotify CDN for album art
+      },
+      {
+        protocol: 'https',
+        hostname: 'mosaic.scdn.co',
+      },
+      {
+        protocol: 'https',
+        hostname: 'lineup-images.scdn.co',
+      },
+    ],
+  },
+};
+
+export default nextConfig;
