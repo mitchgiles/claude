@@ -8,7 +8,7 @@ import WorkoutTimeline from '@/components/WorkoutTimeline';
 import StatsCard from '@/components/StatsCard';
 import { SpinClass } from '@/types/spotify';
 import { formatDuration } from '@/lib/workout-generator';
-import { useSpotifyPlayer } from '@/hooks/useSpotifyPlayer';
+import { useSpotifyEmbed } from '@/hooks/useSpotifyEmbed';
 
 function WorkoutContent() {
   const searchParams = useSearchParams();
@@ -19,7 +19,7 @@ function WorkoutContent() {
   const [elapsed, setElapsed] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const lastPlayedIndexRef = useRef<number | null>(null);
-  const { deviceId, isReady, error: playerError } = useSpotifyPlayer();
+  const { containerRef, isReady, playTrack, pause } = useSpotifyEmbed();
 
   const spinClass = useMemo<SpinClass | null>(() => {
     if (!id) return null;
@@ -44,7 +44,6 @@ function WorkoutContent() {
           setIsPlaying(false);
           return spinClass.totalDuration;
         }
-        // Update active segment
         const activeSegIdx = spinClass.segments.findIndex(
           (seg) => next >= seg.startTime && next < seg.startTime + seg.duration
         );
@@ -56,22 +55,19 @@ function WorkoutContent() {
     return () => clearInterval(interval);
   }, [isPlaying, spinClass]);
 
-  // Trigger Spotify playback whenever the active segment changes.
-  // Also re-triggers when deviceId first becomes available (SDK connects
-  // after workout has already started).
+  // Play the current segment's track whenever it changes
   useEffect(() => {
-    if (!isPlaying || activeIndex === null || !deviceId || !spinClass) return;
+    if (!isPlaying || activeIndex === null || !spinClass) return;
     if (activeIndex === lastPlayedIndexRef.current) return;
     lastPlayedIndexRef.current = activeIndex;
     const uri = spinClass.segments[activeIndex]?.track?.uri;
-    if (!uri) return;
-    fetch('/api/spotify/player', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uri, deviceId }),
-    }).catch(() => {});
-  }, [activeIndex, isPlaying, deviceId, spinClass]);
+    if (uri) playTrack(uri);
+  }, [activeIndex, isPlaying, spinClass, playTrack]);
+
+  // Pause embed when workout is paused
+  useEffect(() => {
+    if (!isPlaying) pause();
+  }, [isPlaying, pause]);
 
   if (!spinClass) {
     return (
@@ -138,7 +134,7 @@ function WorkoutContent() {
           </div>
 
           {/* Progress bar */}
-          <div className="mb-2">
+          <div className="mb-4">
             <div className="flex justify-between text-xs text-gray-500 mb-1">
               <span>{formatDuration(elapsed)}</span>
               <span>{formatDuration(totalDuration)}</span>
@@ -151,15 +147,14 @@ function WorkoutContent() {
             </div>
           </div>
 
-          {/* Spotify player status */}
-          {playerError && (
-            <div className="mt-3 p-3 bg-red-900/30 border border-red-700 rounded-xl">
-              <p className="text-red-300 text-sm">{playerError}</p>
-            </div>
-          )}
-          {!playerError && !isReady && (
-            <div className="mt-3 p-3 bg-gray-800 border border-gray-700 rounded-xl">
-              <p className="text-gray-400 text-sm">Connecting Spotify player…</p>
+          {/* Spotify embed player */}
+          <div
+            ref={containerRef}
+            className={`rounded-xl overflow-hidden transition-opacity ${isReady ? 'opacity-100' : 'opacity-0 h-0'}`}
+          />
+          {!isReady && (
+            <div className="h-[80px] bg-gray-800 rounded-xl flex items-center justify-center">
+              <p className="text-gray-500 text-sm">Loading player…</p>
             </div>
           )}
 
