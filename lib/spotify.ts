@@ -123,11 +123,16 @@ export async function getPlaylist(token: string, playlistId: string) {
   return spotifyFetch(`/playlists/${playlistId}?fields=id,name,description,images,tracks(total),owner(display_name)`, token);
 }
 
-export async function getRecommendations(token: string, genres: string[], limit = 50) {
+// /recommendations is unavailable for new apps (deprecated Nov 2024).
+// Use /search with a genre: filter instead.
+export async function searchTracksByGenre(token: string, genre: string, limit = 50) {
+  // "work-out" is not a searchable genre; use a keyword query instead.
+  const q = genre === 'work-out' ? 'workout' : `genre:${genre}`;
   const params = new URLSearchParams({
-    seed_genres: genres.slice(0, 5).join(','),
-    limit: String(Math.min(limit, 100)),
+    q,
+    type: 'track',
+    limit: String(Math.min(limit, 50)),
     market: 'from_token',
   });
-  return spotifyFetch(`/recommendations?${params}`, token);
+  return spotifyFetch(`/search?${params}`, token);
 }
