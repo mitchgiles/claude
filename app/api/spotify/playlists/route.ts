@@ -3,7 +3,11 @@ import { getAccessToken } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
-  const token = await getAccessToken(req.cookies);
+  const token = await getAccessToken({
+    accessToken: req.cookies.get('spotify_access_token')?.value,
+    refreshToken: req.cookies.get('spotify_refresh_token')?.value,
+    expiresAt: req.cookies.get('spotify_expires_at')?.value,
+  });
   if (!token) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

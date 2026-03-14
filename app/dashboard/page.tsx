@@ -54,8 +54,8 @@ export default function DashboardPage() {
       // 1. Fetch tracks
       const tracksRes = await fetch(`/api/spotify/tracks?playlistId=${playlist.id}`);
       if (tracksRes.status === 401) {
-        window.location.href = '/?error=session_expired';
-        return;
+        const body = await tracksRes.json().catch(() => ({}));
+        throw new Error(`Auth failed — debug: ${JSON.stringify(body.debug ?? body)}`);
       }
       if (!tracksRes.ok) {
         const errData = await tracksRes.json().catch(() => ({}));

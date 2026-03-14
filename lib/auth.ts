@@ -1,9 +1,5 @@
 import { cookies } from 'next/headers';
-import { RequestCookies } from 'next/dist/compiled/@edge-runtime/cookies';
-import { ReadonlyRequestCookies } from 'next/dist/server/web/spec-extension/adapters/request-cookies';
 import { refreshAccessToken } from './spotify';
-
-type CookieStore = RequestCookies | ReadonlyRequestCookies | Awaited<ReturnType<typeof cookies>>;
 
 function cookieOpts(maxAge: number) {
   return {
@@ -15,39 +11,56 @@ function cookieOpts(maxAge: number) {
   };
 }
 
-export async function getAccessToken(reqCookies?: CookieStore): Promise<string | null> {
-  const store = reqCookies ?? await cookies();
+// Accepts raw cookie values directly — avoids any CookieStore abstraction issues
+export async function getAccessToken(rawCookies?: {
+  accessToken?: string;
+  refreshToken?: string;
+  expiresAt?: string;
+}): Promise<string | null> {
+  let accessToken: string | undefined;
+  let refreshToken: string | undefined;
+  let expiresAt: string | undefined;
 
-  const accessToken = store.get('spotify_access_token')?.value;
-  const refreshToken = store.get('spotify_refresh_token')?.value;
-  const expiresAt = store.get('spotify_expires_at')?.value;
+  if (rawCookies) {
+    accessToken = rawCookies.accessToken;
+    refreshToken = rawCookies.refreshToken;
+    expiresAt = rawCookies.expiresAt;
+  } else {
+    const store = await cookies();
+    accessToken = store.get('spotify_access_token')?.value;
+    refreshToken = store.get('spotify_refresh_token')?.value;
+    expiresAt = store.get('spotify_expires_at')?.value;
+  }
 
   if (!refreshToken) return null;
 
+  const expiresAtNum = Number(expiresAt);
+
   // Token still valid (with 60-second buffer)
-  if (accessToken && expiresAt && Date.now() < Number(expiresAt) - 60_000) {
+  if (accessToken && expiresAt && !isNaN(expiresAtNum) && Date.now() < expiresAtNum - 60_000) {
     return accessToken;
   }
 
-  // Refresh expired token
+  // Refresh expired token — only update cookies via next/headers (safe for browser)
   try {
     const refreshed = await refreshAccessToken(refreshToken);
     const newExpiresAt = Date.now() + refreshed.expires_in * 1000;
     try {
-      const writableStore = reqCookies ?? await cookies();
-      writableStore.set('spotify_access_token', refreshed.access_token, cookieOpts(refreshed.expires_in));
-      writableStore.set('spotify_expires_at', String(newExpiresAt), cookieOpts(60 * 60 * 24 * 30));
+      const store = await cookies();
+      store.set('spotify_access_token', refreshed.access_token, cookieOpts(refreshed.expires_in));
+      store.set('spotify_expires_at', String(newExpiresAt), cookieOpts(60 * 60 * 24 * 30));
     } catch {
       // ignore — token still returned below
     }
     return refreshed.access_token;
   } catch (err) {
     console.error('Token refresh failed:', err);
+    // Only clear cookies via next/headers — never via req.cookies which clears the browser
     try {
-      const writableStore = reqCookies ?? await cookies();
-      writableStore.delete('spotify_refresh_token');
-      writableStore.delete('spotify_access_token');
-      writableStore.delete('spotify_expires_at');
+      const store = await cookies();
+      store.delete('spotify_refresh_token');
+      store.delete('spotify_access_token');
+      store.delete('spotify_expires_at');
     } catch {
       // ignore
     }

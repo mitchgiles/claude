@@ -3,9 +3,15 @@ import { getAccessToken } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
-  const token = await getAccessToken(req.cookies);
+  const at = req.cookies.get('spotify_access_token')?.value;
+  const rt = req.cookies.get('spotify_refresh_token')?.value;
+  const ea = req.cookies.get('spotify_expires_at')?.value;
+  const token = await getAccessToken({ accessToken: at, refreshToken: rt, expiresAt: ea });
   if (!token) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({
+      error: 'Unauthorized',
+      debug: { hasAt: !!at, hasRt: !!rt, hasEa: !!ea, ea, dateNow: Date.now() },
+    }, { status: 401 });
   }
 
   const { searchParams } = new URL(req.url);
