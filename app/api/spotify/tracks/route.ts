@@ -3,15 +3,16 @@ import { getAccessToken } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
-  const at = req.cookies.get('spotify_access_token')?.value;
-  const rt = req.cookies.get('spotify_refresh_token')?.value;
-  const ea = req.cookies.get('spotify_expires_at')?.value;
-  const token = await getAccessToken({ accessToken: at, refreshToken: rt, expiresAt: ea });
+  const token = await getAccessToken();
   if (!token) {
     return NextResponse.json({
       error: 'Unauthorized',
       debug: {
-        hasAt: !!at, hasRt: !!rt, hasEa: !!ea, ea, dateNow: Date.now(),
+        hasAt: !!req.cookies.get('spotify_access_token')?.value,
+        hasRt: !!req.cookies.get('spotify_refresh_token')?.value,
+        hasEa: !!req.cookies.get('spotify_expires_at')?.value,
+        ea: req.cookies.get('spotify_expires_at')?.value,
+        dateNow: Date.now(),
         rawCookieHeader: req.headers.get('cookie'),
         allCookieNames: req.cookies.getAll().map(c => c.name),
       },
