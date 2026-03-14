@@ -121,7 +121,21 @@ function WorkoutContent() {
                 Reset
               </button>
               <button
-                onClick={() => setIsPlaying((p) => !p)}
+                onClick={() => {
+                  const starting = !isPlaying;
+                  setIsPlaying((p) => !p);
+                  if (starting && spinClass) {
+                    // Must call playTrack synchronously inside the click handler
+                    // so the browser autoplay policy considers it user-initiated.
+                    const idx = activeIndex ?? 0;
+                    const uri = spinClass.segments[idx]?.track?.uri;
+                    if (uri) {
+                      playTrack(uri);
+                      lastPlayedIndexRef.current = idx;
+                      if (activeIndex === null) setActiveIndex(idx);
+                    }
+                  }
+                }}
                 className={`px-6 py-2 rounded-full font-semibold text-sm transition-all ${
                   isPlaying
                     ? 'bg-gray-700 hover:bg-gray-600 text-white'
