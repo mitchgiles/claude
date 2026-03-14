@@ -98,7 +98,7 @@ export async function getPlaylistTracks(
   offset = 0
 ) {
   return spotifyFetch(
-    `/playlists/${playlistId}/tracks?limit=${limit}&offset=${offset}&fields=items(track(id,name,artists,album,duration_ms,uri)),total,next`,
+    `/playlists/${playlistId}/tracks?limit=${limit}&offset=${offset}`,
     token
   );
 }

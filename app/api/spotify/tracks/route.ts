@@ -26,12 +26,12 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Fetch up to 50 tracks
     const data = await getPlaylistTracks(token, playlistId, 50, 0);
     return NextResponse.json(data);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('Tracks error:', msg);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    const status = msg.includes('403') ? 403 : 500;
+    return NextResponse.json({ error: msg }, { status });
   }
 }
