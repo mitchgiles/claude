@@ -6,6 +6,20 @@ import PlaylistCard from '@/components/PlaylistCard';
 import { SpotifyPlaylist, SpotifyTrack, AudioFeatures, SpinClass } from '@/types/spotify';
 import { generateSpinClass } from '@/lib/workout-generator';
 
+/** Extract playlist ID from a Spotify URL or URI, or return the raw value if it's already an ID. */
+function parseSpotifyPlaylistId(input: string): string | null {
+  const trimmed = input.trim();
+  // https://open.spotify.com/playlist/37i9dQZF1DX...
+  const urlMatch = trimmed.match(/spotify\.com\/playlist\/([A-Za-z0-9]+)/);
+  if (urlMatch) return urlMatch[1];
+  // spotify:playlist:37i9dQZF1DX...
+  const uriMatch = trimmed.match(/^spotify:playlist:([A-Za-z0-9]+)$/);
+  if (uriMatch) return uriMatch[1];
+  // bare ID (22 alphanumeric chars)
+  if (/^[A-Za-z0-9]{22}$/.test(trimmed)) return trimmed;
+  return null;
+}
+
 export default function DashboardPage() {
   const [playlists, setPlaylists] = useState<SpotifyPlaylist[]>([]);
   const [selectedPlaylist, setSelectedPlaylist] = useState<SpotifyPlaylist | null>(null);
@@ -15,6 +29,8 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
+  const [urlInput, setUrlInput] = useState('');
+  const [urlError, setUrlError] = useState<string | null>(null);
   const LIMIT = 20;
 
   const fetchPlaylists = useCallback(async (newOffset: number) => {
@@ -119,6 +135,29 @@ export default function DashboardPage() {
     }
   }
 
+  async function handleUrlSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setUrlError(null);
+    const playlistId = parseSpotifyPlaylistId(urlInput);
+    if (!playlistId) {
+      setUrlError('Paste a Spotify playlist URL, URI, or ID');
+      return;
+    }
+    try {
+      const res = await fetch(`/api/spotify/playlist?id=${playlistId}`, { credentials: 'include', cache: 'no-store' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setUrlError(body.error || 'Could not load that playlist');
+        return;
+      }
+      const playlist: SpotifyPlaylist = await res.json();
+      setUrlInput('');
+      handleGenerateWorkout(playlist);
+    } catch {
+      setUrlError('Could not load that playlist');
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-950">
       {/* Header */}
@@ -141,6 +180,27 @@ export default function DashboardPage() {
         {/* Playlist sidebar */}
         <aside className="w-full lg:w-80 flex-shrink-0">
           <h2 className="text-lg font-semibold text-white mb-4">Your Playlists</h2>
+
+          {/* Paste any Spotify playlist URL */}
+          <form onSubmit={handleUrlSubmit} className="mb-4">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={urlInput}
+                onChange={(e) => { setUrlInput(e.target.value); setUrlError(null); }}
+                placeholder="Paste Spotify playlist URL…"
+                className="flex-1 min-w-0 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
+              />
+              <button
+                type="submit"
+                disabled={isGenerating || !urlInput.trim()}
+                className="px-3 py-2 bg-green-600 hover:bg-green-500 disabled:opacity-40 text-white text-sm rounded-lg transition-colors shrink-0"
+              >
+                Go
+              </button>
+            </div>
+            {urlError && <p className="mt-1 text-xs text-red-400">{urlError}</p>}
+          </form>
 
           {error && !isGenerating && (
             <div className="mb-4 p-3 bg-red-900/30 border border-red-700 rounded-lg text-red-300 text-sm">

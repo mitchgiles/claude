@@ -118,3 +118,7 @@ export async function getAudioFeatures(token: string, trackIds: string[]) {
 export async function getCurrentUser(token: string) {
   return spotifyFetch('/me', token);
 }
+
+export async function getPlaylist(token: string, playlistId: string) {
+  return spotifyFetch(`/playlists/${playlistId}?fields=id,name,description,images,tracks(total),owner(display_name)`, token);
+}
