@@ -21,36 +21,62 @@ export async function GET(req: NextRequest) {
     expiresAt: reqExpiresAt,
   });
 
-  // Test the token against Spotify if we have one
-  let spotifyMeStatus: number | string | null = null;
   const tokenToTest = tokenFromReqCookies ?? accessToken;
+
+  // Test /me
+  let spotifyMeStatus: number | string | null = null;
+  let spotifyMeBody: unknown = null;
+  // Test /me/playlists
+  let spotifyPlaylistsStatus: number | string | null = null;
+  // Test a known playlist items call (first playlist if available)
+  let spotifyItemsStatus: number | string | null = null;
+  let spotifyItemsBody: unknown = null;
+  let firstPlaylistId: string | null = null;
+
   if (tokenToTest) {
+    const h = { Authorization: `Bearer ${tokenToTest}` };
     try {
-      const res = await fetch('https://api.spotify.com/v1/me', {
-        headers: { Authorization: `Bearer ${tokenToTest}` },
-      });
-      spotifyMeStatus = res.status;
-    } catch (e) {
-      spotifyMeStatus = `fetch error: ${e instanceof Error ? e.message : String(e)}`;
+      const r = await fetch('https://api.spotify.com/v1/me', { headers: h });
+      spotifyMeStatus = r.status;
+      spotifyMeBody = await r.json().catch(() => null);
+    } catch (e) { spotifyMeStatus = `error: ${e instanceof Error ? e.message : e}`; }
+
+    try {
+      const r = await fetch('https://api.spotify.com/v1/me/playlists?limit=1', { headers: h });
+      spotifyPlaylistsStatus = r.status;
+      const body = await r.json().catch(() => null);
+      firstPlaylistId = body?.items?.[0]?.id ?? null;
+    } catch (e) { spotifyPlaylistsStatus = `error: ${e instanceof Error ? e.message : e}`; }
+
+    if (firstPlaylistId) {
+      try {
+        const r = await fetch(
+          `https://api.spotify.com/v1/playlists/${firstPlaylistId}/items?limit=1&market=from_token&additional_types=track`,
+          { headers: h }
+        );
+        spotifyItemsStatus = r.status;
+        spotifyItemsBody = await r.json().catch(() => null);
+      } catch (e) { spotifyItemsStatus = `error: ${e instanceof Error ? e.message : e}`; }
     }
   }
 
   const state = {
-    // via cookies() from next/headers
     nextHeaders_has_access_token: !!accessToken,
     nextHeaders_has_refresh_token: !!refreshToken,
-    nextHeaders_has_expires_at: !!expiresAt,
-    // via req.cookies
     reqCookies_has_access_token: !!reqAccessToken,
     reqCookies_has_refresh_token: !!reqRefreshToken,
-    reqCookies_has_expires_at: !!reqExpiresAt,
-    // getAccessToken result
     getAccessToken_returned_token: !!tokenFromReqCookies,
     expires_in_seconds: expiresAt ? Math.round((Number(expiresAt) - Date.now()) / 1000) : null,
-    // Spotify API test
-    spotify_me_status: spotifyMeStatus,
     client_id_set: !!process.env.SPOTIFY_CLIENT_ID,
     redirect_uri: process.env.SPOTIFY_REDIRECT_URI,
+    // Live Spotify API tests
+    spotify_me_status: spotifyMeStatus,
+    spotify_me_country: (spotifyMeBody as { country?: string } | null)?.country ?? null,
+    spotify_me_product: (spotifyMeBody as { product?: string } | null)?.product ?? null,
+    spotify_playlists_status: spotifyPlaylistsStatus,
+    first_playlist_id: firstPlaylistId,
+    spotify_items_status: spotifyItemsStatus,
+    spotify_items_error: spotifyItemsBody,
   };
 
   return NextResponse.json(state);

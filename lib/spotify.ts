@@ -104,9 +104,8 @@ export async function getPlaylistTracks(
   limit = 50,
   offset = 0
 ) {
-  // /tracks is deprecated; /items is the current endpoint (returns tracks + episodes)
   return spotifyFetch(
-    `/playlists/${playlistId}/items?limit=${limit}&offset=${offset}`,
+    `/playlists/${playlistId}/items?limit=${limit}&offset=${offset}&market=from_token&additional_types=track`,
     token
   );
 }
