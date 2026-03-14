@@ -14,18 +14,24 @@ interface SpotifyEmbedController {
   loadUri(uri: string): void;
   play(): void;
   pause(): void;
+  addListener(event: 'playback_update', cb: (e: { data: { isPaused: boolean; position: number } }) => void): void;
+  addListener(event: string, cb: (e: unknown) => void): void;
 }
 
 declare global {
   interface Window {
     onSpotifyIframeApiReady?: (api: SpotifyIFrameAPI) => void;
-    SpotifyIframeApi?: SpotifyIFrameAPI;
   }
 }
+
+// Module-level cache so StrictMode's double-invoke doesn't lose the API
+// reference (the SDK only calls onSpotifyIframeApiReady once).
+let cachedApi: SpotifyIFrameAPI | null = null;
 
 export function useSpotifyEmbed() {
   const containerRef = useRef<HTMLDivElement>(null);
   const controllerRef = useRef<SpotifyEmbedController | null>(null);
+  const pendingUriRef = useRef<string | null>(null);
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
@@ -33,24 +39,33 @@ export function useSpotifyEmbed() {
     let cancelled = false;
 
     function initController(api: SpotifyIFrameAPI) {
+      cachedApi = api;
       if (cancelled || !containerRef.current) return;
-      // Clear any previous iframe from StrictMode double-invoke
       containerRef.current.innerHTML = '';
       api.createController(
         containerRef.current,
-        // Initial URI is required but won't auto-play
-        { uri: 'spotify:track:4uLU6hMCjMI75M1A2tKUQC', height: '80' },
+        { uri: 'spotify:track:4uLU6hMCjMI75M1A2tKUQC', height: '152' },
         (controller) => {
-          if (!cancelled) {
-            controllerRef.current = controller;
-            setIsReady(true);
-          }
+          if (cancelled) return;
+          controllerRef.current = controller;
+
+          // Play any track that was queued before the controller was ready
+          controller.addListener('ready' as string, () => {
+            if (!cancelled) setIsReady(true);
+            if (pendingUriRef.current) {
+              controller.loadUri(pendingUriRef.current);
+              controller.play();
+              pendingUriRef.current = null;
+            }
+          });
+
+          setIsReady(true);
         }
       );
     }
 
-    if (window.SpotifyIframeApi) {
-      initController(window.SpotifyIframeApi);
+    if (cachedApi) {
+      initController(cachedApi);
     } else {
       window.onSpotifyIframeApiReady = initController;
       if (!document.querySelector('script[src*="embed/iframe-api"]')) {
@@ -70,8 +85,15 @@ export function useSpotifyEmbed() {
   }, []);
 
   const playTrack = useCallback((uri: string) => {
-    controllerRef.current?.loadUri(uri);
-    controllerRef.current?.play();
+    const ctrl = controllerRef.current;
+    if (!ctrl) {
+      // Controller not ready yet — queue the URI
+      pendingUriRef.current = uri;
+      return;
+    }
+    ctrl.loadUri(uri);
+    // Small delay to let the iframe buffer the track before playing
+    setTimeout(() => ctrl.play(), 300);
   }, []);
 
   const pause = useCallback(() => {

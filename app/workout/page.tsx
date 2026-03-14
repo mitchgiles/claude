@@ -161,16 +161,15 @@ function WorkoutContent() {
             </div>
           </div>
 
-          {/* Spotify embed player */}
-          <div
-            ref={containerRef}
-            className={`rounded-xl overflow-hidden transition-opacity ${isReady ? 'opacity-100' : 'opacity-0 h-0'}`}
-          />
-          {!isReady && (
-            <div className="h-[80px] bg-gray-800 rounded-xl flex items-center justify-center">
-              <p className="text-gray-500 text-sm">Loading player…</p>
-            </div>
-          )}
+          {/* Spotify embed player — always rendered so the iframe can mount */}
+          <div className="relative rounded-xl overflow-hidden bg-gray-800 h-[152px]">
+            {!isReady && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <p className="text-gray-500 text-sm">Loading player…</p>
+              </div>
+            )}
+            <div ref={containerRef} className="w-full h-full" />
+          </div>
 
           {/* Current segment callout */}
           {currentSegment && isPlaying && (
