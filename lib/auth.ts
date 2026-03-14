@@ -25,11 +25,15 @@ export async function getAccessToken(rawCookies?: {
     accessToken = rawCookies.accessToken;
     refreshToken = rawCookies.refreshToken;
     expiresAt = rawCookies.expiresAt;
-  } else {
+  }
+
+  // Fallback to next/headers cookie store when raw route-handler cookies are missing.
+  // In some runtimes/environments, req.cookies can be empty while cookies() is populated.
+  if (!rawCookies || !refreshToken) {
     const store = await cookies();
-    accessToken = store.get('spotify_access_token')?.value;
-    refreshToken = store.get('spotify_refresh_token')?.value;
-    expiresAt = store.get('spotify_expires_at')?.value;
+    accessToken = accessToken ?? store.get('spotify_access_token')?.value;
+    refreshToken = refreshToken ?? store.get('spotify_refresh_token')?.value;
+    expiresAt = expiresAt ?? store.get('spotify_expires_at')?.value;
   }
 
   if (!refreshToken) return null;

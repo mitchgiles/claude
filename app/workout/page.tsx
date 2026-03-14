@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SegmentCard from '@/components/SegmentCard';
@@ -14,23 +14,21 @@ function WorkoutContent() {
   const router = useRouter();
   const id = searchParams.get('id');
 
-  const [spinClass, setSpinClass] = useState<SpinClass | null>(null);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
 
-  useEffect(() => {
-    if (!id) {
-      router.push('/dashboard');
-      return;
-    }
+  const spinClass = useMemo<SpinClass | null>(() => {
+    if (!id) return null;
     const stored = sessionStorage.getItem(`spinClass-${id}`);
-    if (stored) {
-      setSpinClass(JSON.parse(stored));
-    } else {
+    return stored ? (JSON.parse(stored) as SpinClass) : null;
+  }, [id]);
+
+  useEffect(() => {
+    if (!id || !spinClass) {
       router.push('/dashboard');
     }
-  }, [id, router]);
+  }, [id, router, spinClass]);
 
   // Workout timer
   useEffect(() => {
@@ -83,9 +81,9 @@ function WorkoutContent() {
             <span className="text-white font-semibold truncate">{playlistName}</span>
           </div>
           <div className="flex items-center gap-2">
-            <Link href="/api/auth/logout" className="text-gray-500 hover:text-white text-sm transition-colors">
+            <a href="/api/auth/logout" className="text-gray-500 hover:text-white text-sm transition-colors">
               Log out
-            </Link>
+            </a>
           </div>
         </div>
       </header>

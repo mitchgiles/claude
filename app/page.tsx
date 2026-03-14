@@ -25,7 +25,7 @@ export default function HomePage({ searchParams }: { searchParams: Promise<{ err
           <span className="text-green-400"> epic spin classes</span>
         </h2>
         <p className="text-gray-400 text-lg max-w-xl mb-10">
-          SpinSync analyzes your music's tempo, energy, and danceability to create personalized
+          SpinSync analyzes your music&apos;s tempo, energy, and danceability to create personalized
           indoor cycling workouts. Connect Spotify and start riding in minutes.
         </p>
 
