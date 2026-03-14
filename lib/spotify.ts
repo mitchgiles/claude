@@ -122,3 +122,12 @@ export async function getCurrentUser(token: string) {
 export async function getPlaylist(token: string, playlistId: string) {
   return spotifyFetch(`/playlists/${playlistId}?fields=id,name,description,images,tracks(total),owner(display_name)`, token);
 }
+
+export async function getRecommendations(token: string, genres: string[], limit = 50) {
+  const params = new URLSearchParams({
+    seed_genres: genres.slice(0, 5).join(','),
+    limit: String(Math.min(limit, 100)),
+    market: 'from_token',
+  });
+  return spotifyFetch(`/recommendations?${params}`, token);
+}

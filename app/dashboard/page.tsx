@@ -6,19 +6,20 @@ import PlaylistCard from '@/components/PlaylistCard';
 import { SpotifyPlaylist, SpotifyTrack, AudioFeatures, SpinClass } from '@/types/spotify';
 import { generateSpinClass } from '@/lib/workout-generator';
 
-/** Extract playlist ID from a Spotify URL or URI, or return the raw value if it's already an ID. */
-function parseSpotifyPlaylistId(input: string): string | null {
-  const trimmed = input.trim();
-  // https://open.spotify.com/playlist/37i9dQZF1DX...
-  const urlMatch = trimmed.match(/spotify\.com\/playlist\/([A-Za-z0-9]+)/);
-  if (urlMatch) return urlMatch[1];
-  // spotify:playlist:37i9dQZF1DX...
-  const uriMatch = trimmed.match(/^spotify:playlist:([A-Za-z0-9]+)$/);
-  if (uriMatch) return uriMatch[1];
-  // bare ID (22 alphanumeric chars)
-  if (/^[A-Za-z0-9]{22}$/.test(trimmed)) return trimmed;
-  return null;
-}
+const SPIN_GENRES: { id: string; label: string }[] = [
+  { id: 'work-out', label: 'Workout' },
+  { id: 'pop', label: 'Pop' },
+  { id: 'dance', label: 'Dance' },
+  { id: 'edm', label: 'EDM' },
+  { id: 'hip-hop', label: 'Hip-Hop' },
+  { id: 'rock', label: 'Rock' },
+  { id: 'house', label: 'House' },
+  { id: 'latin', label: 'Latin' },
+  { id: 'electronic', label: 'Electronic' },
+  { id: 'disco', label: 'Disco' },
+  { id: 'r-n-b', label: 'R&B' },
+  { id: 'drum-and-bass', label: 'DnB' },
+];
 
 export default function DashboardPage() {
   const [playlists, setPlaylists] = useState<SpotifyPlaylist[]>([]);
@@ -29,8 +30,7 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
-  const [urlInput, setUrlInput] = useState('');
-  const [urlError, setUrlError] = useState<string | null>(null);
+  const [genreError, setGenreError] = useState<string | null>(null);
   const LIMIT = 20;
 
   const fetchPlaylists = useCallback(async (newOffset: number) => {
@@ -135,26 +135,69 @@ export default function DashboardPage() {
     }
   }
 
-  async function handleUrlSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setUrlError(null);
-    const playlistId = parseSpotifyPlaylistId(urlInput);
-    if (!playlistId) {
-      setUrlError('Paste a Spotify playlist URL, URI, or ID');
-      return;
-    }
+  async function handleGenreWorkout(genre: string) {
+    setGenreError(null);
+    const label = SPIN_GENRES.find((g) => g.id === genre)?.label ?? genre;
+    const syntheticPlaylist: SpotifyPlaylist = {
+      id: `genre-${genre}`,
+      name: `${label} Mix`,
+      description: '',
+      images: [],
+      tracks: { total: 50 },
+      owner: { display_name: 'Spotify' },
+    };
+    setSelectedPlaylist(syntheticPlaylist);
+    setSpinClass(null);
+    setIsGenerating(true);
+    setError(null);
+
     try {
-      const res = await fetch(`/api/spotify/playlist?id=${playlistId}`, { credentials: 'include', cache: 'no-store' });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        setUrlError(body.error || 'Could not load that playlist');
-        return;
+      const recRes = await fetch(`/api/spotify/recommendations?genres=${genre}`, {
+        credentials: 'include',
+        cache: 'no-store',
+      });
+      if (!recRes.ok) {
+        const body = await recRes.json().catch(() => ({}));
+        throw new Error(body.error || `Failed to fetch recommendations (${recRes.status})`);
       }
-      const playlist: SpotifyPlaylist = await res.json();
-      setUrlInput('');
-      handleGenerateWorkout(playlist);
-    } catch {
-      setUrlError('Could not load that playlist');
+      const recData = await recRes.json();
+      const tracks: SpotifyTrack[] = (recData.tracks as SpotifyTrack[]).filter(
+        (t) => t && t.id
+      );
+      if (tracks.length === 0) throw new Error('No tracks found for this genre');
+
+      let featuresMap = new Map<string, AudioFeatures>();
+      try {
+        const ids = tracks.map((t) => t.id).join(',');
+        const featuresRes = await fetch(`/api/spotify/features?ids=${ids}`, {
+          credentials: 'include',
+          cache: 'no-store',
+        });
+        if (featuresRes.ok) {
+          const featuresData = await featuresRes.json();
+          featuresMap = new Map<string, AudioFeatures>(
+            (featuresData.audio_features as AudioFeatures[])
+              .filter(Boolean)
+              .map((f) => [f.id, f])
+          );
+        }
+      } catch {
+        console.warn('Audio features fetch failed, using defaults');
+      }
+
+      const tracksWithFeatures = tracks.map((track) => ({
+        track,
+        features: featuresMap.get(track.id) ?? {
+          id: track.id, tempo: 128, energy: 0.7, valence: 0.5, danceability: 0.6,
+        } as AudioFeatures,
+      }));
+
+      const generated = generateSpinClass(tracksWithFeatures, syntheticPlaylist.name);
+      setSpinClass(generated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong');
+    } finally {
+      setIsGenerating(false);
     }
   }
 
@@ -179,28 +222,25 @@ export default function DashboardPage() {
       <div className="max-w-7xl mx-auto px-4 py-8 flex gap-6 flex-col lg:flex-row">
         {/* Playlist sidebar */}
         <aside className="w-full lg:w-80 flex-shrink-0">
-          <h2 className="text-lg font-semibold text-white mb-4">Your Playlists</h2>
-
-          {/* Paste any Spotify playlist URL */}
-          <form onSubmit={handleUrlSubmit} className="mb-4">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={urlInput}
-                onChange={(e) => { setUrlInput(e.target.value); setUrlError(null); }}
-                placeholder="Paste Spotify playlist URL…"
-                className="flex-1 min-w-0 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-green-500"
-              />
-              <button
-                type="submit"
-                disabled={isGenerating || !urlInput.trim()}
-                className="px-3 py-2 bg-green-600 hover:bg-green-500 disabled:opacity-40 text-white text-sm rounded-lg transition-colors shrink-0"
-              >
-                Go
-              </button>
+          {/* Genre-based random playlist */}
+          <div className="mb-5">
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Generate by genre</p>
+            <div className="flex flex-wrap gap-2">
+              {SPIN_GENRES.map((g) => (
+                <button
+                  key={g.id}
+                  onClick={() => handleGenreWorkout(g.id)}
+                  disabled={isGenerating}
+                  className="px-3 py-1.5 rounded-full text-xs font-medium bg-gray-800 hover:bg-green-600 text-gray-300 hover:text-white border border-gray-700 hover:border-green-500 transition-colors disabled:opacity-40"
+                >
+                  {g.label}
+                </button>
+              ))}
             </div>
-            {urlError && <p className="mt-1 text-xs text-red-400">{urlError}</p>}
-          </form>
+            {genreError && <p className="mt-1 text-xs text-red-400">{genreError}</p>}
+          </div>
+
+          <h2 className="text-lg font-semibold text-white mb-3">Your Playlists</h2>
 
           {error && !isGenerating && (
             <div className="mb-4 p-3 bg-red-900/30 border border-red-700 rounded-lg text-red-300 text-sm">
