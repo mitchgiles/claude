@@ -7,6 +7,8 @@ export const SCOPES = [
   'playlist-read-private',
   'playlist-read-collaborative',
   'user-library-read',
+  'user-modify-playback-state',
+  'user-read-playback-state',
 ].join(' ');
 
 export function getAuthUrl(): string {
@@ -121,6 +123,21 @@ export async function getCurrentUser(token: string) {
 
 export async function getPlaylist(token: string, playlistId: string) {
   return spotifyFetch(`/playlists/${playlistId}?fields=id,name,description,images,tracks(total),owner(display_name)`, token);
+}
+
+export async function startPlayback(token: string, trackUri: string) {
+  const res = await fetch(`${SPOTIFY_BASE_URL}/me/player/play`, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ uris: [trackUri] }),
+  });
+  // 204 = success; 404 = no active device
+  if (res.status === 204 || res.status === 202) return;
+  const raw = await res.text().catch(() => '');
+  throw new Error(`Spotify playback error: ${res.status} ${raw.slice(0, 200)}`);
 }
 
 // /recommendations is unavailable for new apps (deprecated Nov 2024).

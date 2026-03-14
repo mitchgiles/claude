@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, Suspense } from 'react';
+import { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SegmentCard from '@/components/SegmentCard';
@@ -17,6 +17,8 @@ function WorkoutContent() {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [noDevice, setNoDevice] = useState(false);
+  const lastPlayedIndexRef = useRef<number | null>(null);
 
   const spinClass = useMemo<SpinClass | null>(() => {
     if (!id) return null;
@@ -52,6 +54,24 @@ function WorkoutContent() {
 
     return () => clearInterval(interval);
   }, [isPlaying, spinClass]);
+
+  // Trigger Spotify playback whenever the active segment changes
+  useEffect(() => {
+    if (!isPlaying || activeIndex === null || activeIndex === lastPlayedIndexRef.current) return;
+    if (!spinClass) return;
+    lastPlayedIndexRef.current = activeIndex;
+    const uri = spinClass.segments[activeIndex]?.track?.uri;
+    if (!uri) return;
+    fetch('/api/spotify/player', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ uri }),
+    }).then((res) => {
+      if (res.status === 404) setNoDevice(true);
+      else setNoDevice(false);
+    }).catch(() => {});
+  }, [activeIndex, isPlaying, spinClass]);
 
   if (!spinClass) {
     return (
@@ -99,7 +119,7 @@ function WorkoutContent() {
             </div>
             <div className="flex items-center gap-3">
               <button
-                onClick={() => { setElapsed(0); setActiveIndex(null); setIsPlaying(false); }}
+                onClick={() => { setElapsed(0); setActiveIndex(null); setIsPlaying(false); lastPlayedIndexRef.current = null; }}
                 className="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm transition-colors"
               >
                 Reset
@@ -130,6 +150,15 @@ function WorkoutContent() {
               />
             </div>
           </div>
+
+          {/* No active Spotify device warning */}
+          {noDevice && isPlaying && (
+            <div className="mt-3 p-3 bg-yellow-900/30 border border-yellow-700 rounded-xl">
+              <p className="text-yellow-300 text-sm">
+                No active Spotify device found. Open Spotify on any device, play something briefly, then resume here.
+              </p>
+            </div>
+          )}
 
           {/* Current segment callout */}
           {currentSegment && isPlaying && (
