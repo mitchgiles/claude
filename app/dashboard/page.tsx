@@ -20,7 +20,10 @@ export default function DashboardPage() {
   const fetchPlaylists = useCallback(async (newOffset: number) => {
     setIsLoadingPlaylists(true);
     try {
-      const res = await fetch(`/api/spotify/playlists?limit=${LIMIT}&offset=${newOffset}`);
+      const res = await fetch(`/api/spotify/playlists?limit=${LIMIT}&offset=${newOffset}`, {
+        credentials: 'include',
+        cache: 'no-store',
+      });
       if (res.status === 401) {
         setPlaylists([]);
         window.location.href = '/?error=session_expired';
@@ -53,7 +56,10 @@ export default function DashboardPage() {
 
     try {
       // 1. Fetch tracks
-      const tracksRes = await fetch(`/api/spotify/tracks?playlistId=${playlist.id}`);
+      const tracksRes = await fetch(`/api/spotify/tracks?playlistId=${playlist.id}`, {
+        credentials: 'include',
+        cache: 'no-store',
+      });
       if (tracksRes.status === 401) {
         const body = await tracksRes.json().catch(() => ({}));
         throw new Error(`Auth failed — debug: ${JSON.stringify(body.debug ?? body)}`);
@@ -74,7 +80,10 @@ export default function DashboardPage() {
       let featuresMap = new Map<string, AudioFeatures>();
       try {
         const ids = tracks.map((t) => t.id).join(',');
-        const featuresRes = await fetch(`/api/spotify/features?ids=${ids}`);
+        const featuresRes = await fetch(`/api/spotify/features?ids=${ids}`, {
+          credentials: 'include',
+          cache: 'no-store',
+        });
         if (featuresRes.ok) {
           const featuresData = await featuresRes.json();
           featuresMap = new Map<string, AudioFeatures>(
