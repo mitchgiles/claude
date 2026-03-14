@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const refreshToken = req.cookies.get('spotify_refresh_token')?.value;
   if (!refreshToken) {
     return NextResponse.redirect(new URL('/', req.url));
