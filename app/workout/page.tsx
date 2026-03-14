@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo, Suspense } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SegmentCard from '@/components/SegmentCard';
@@ -17,8 +17,6 @@ function WorkoutContent() {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [noPreview, setNoPreview] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const spinClass = useMemo<SpinClass | null>(() => {
     if (!id) return null;
@@ -29,16 +27,6 @@ function WorkoutContent() {
   useEffect(() => {
     if (!id || !spinClass) router.push('/dashboard');
   }, [id, router, spinClass]);
-
-  // Initialise audio element once
-  useEffect(() => {
-    audioRef.current = new Audio();
-    audioRef.current.loop = true;
-    return () => {
-      audioRef.current?.pause();
-      audioRef.current = null;
-    };
-  }, []);
 
   // Workout timer
   useEffect(() => {
@@ -60,25 +48,6 @@ function WorkoutContent() {
     return () => clearInterval(interval);
   }, [isPlaying, spinClass]);
 
-  // Load + play preview whenever the active track changes
-  useEffect(() => {
-    if (!isPlaying || activeIndex === null || !spinClass || !audioRef.current) return;
-    const url = spinClass.segments[activeIndex]?.track?.preview_url;
-    if (!url) { setNoPreview(true); return; }
-    setNoPreview(false);
-    audioRef.current.src = url;
-    audioRef.current.play().catch(() => {});
-  }, [activeIndex, isPlaying, spinClass]);
-
-  function playSegment(idx: number) {
-    if (!spinClass || !audioRef.current) return;
-    const url = spinClass.segments[idx]?.track?.preview_url;
-    if (!url) { setNoPreview(true); return; }
-    setNoPreview(false);
-    audioRef.current.src = url;
-    audioRef.current.play().catch(() => {});
-  }
-
   if (!spinClass) {
     return (
       <div className="min-h-screen bg-gray-950 flex items-center justify-center">
@@ -91,30 +60,21 @@ function WorkoutContent() {
   const minutes = Math.floor(totalDuration / 60);
   const progressPct = (elapsed / totalDuration) * 100;
   const currentSegment = activeIndex !== null ? segments[activeIndex] : null;
+  const currentTrackId = activeIndex !== null ? segments[activeIndex].track.id : null;
 
   return (
     <div className="min-h-screen bg-gray-950">
-      {/* Header */}
       <header className="border-b border-gray-800 bg-gray-950 sticky top-0 z-20">
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link href="/dashboard" className="text-gray-400 hover:text-white transition-colors p-1">
-              ←
-            </Link>
+            <Link href="/dashboard" className="text-gray-400 hover:text-white transition-colors p-1">←</Link>
             <span className="text-white font-semibold truncate">{playlistName}</span>
           </div>
-          <a href="/api/auth/logout" className="text-gray-500 hover:text-white text-sm transition-colors">
-            Log out
-          </a>
+          <a href="/api/auth/logout" className="text-gray-500 hover:text-white text-sm transition-colors">Log out</a>
         </div>
       </header>
 
       <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
-
-        {/* DEBUG — remove once audio is confirmed working */}
-        <div className="bg-gray-800 text-xs text-gray-300 p-3 rounded-lg font-mono">
-          track[0] preview_url: <span className="text-yellow-400">{String(segments[0]?.track?.preview_url ?? 'NULL')}</span>
-        </div>
 
         {/* Workout controls */}
         <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6">
@@ -125,12 +85,7 @@ function WorkoutContent() {
             </div>
             <div className="flex items-center gap-3">
               <button
-                onClick={() => {
-                  audioRef.current?.pause();
-                  setElapsed(0);
-                  setActiveIndex(null);
-                  setIsPlaying(false);
-                }}
+                onClick={() => { setElapsed(0); setActiveIndex(null); setIsPlaying(false); }}
                 className="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm transition-colors"
               >
                 Reset
@@ -139,20 +94,10 @@ function WorkoutContent() {
                 onClick={() => {
                   const starting = !isPlaying;
                   setIsPlaying((p) => !p);
-                  if (starting) {
-                    const idx = activeIndex ?? 0;
-                    if (activeIndex === null) setActiveIndex(idx);
-                    // Call play() directly in the click handler so the browser
-                    // treats it as user-initiated (satisfies autoplay policy).
-                    playSegment(idx);
-                  } else {
-                    audioRef.current?.pause();
-                  }
+                  if (starting && activeIndex === null) setActiveIndex(0);
                 }}
                 className={`px-6 py-2 rounded-full font-semibold text-sm transition-all ${
-                  isPlaying
-                    ? 'bg-gray-700 hover:bg-gray-600 text-white'
-                    : 'bg-green-500 hover:bg-green-400 text-black'
+                  isPlaying ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-green-500 hover:bg-green-400 text-black'
                 }`}
               >
                 {isPlaying ? '⏸ Pause' : '▶ Start Workout'}
@@ -161,7 +106,7 @@ function WorkoutContent() {
           </div>
 
           {/* Progress bar */}
-          <div className="mb-2">
+          <div className="mb-4">
             <div className="flex justify-between text-xs text-gray-500 mb-1">
               <span>{formatDuration(elapsed)}</span>
               <span>{formatDuration(totalDuration)}</span>
@@ -174,13 +119,24 @@ function WorkoutContent() {
             </div>
           </div>
 
-          {noPreview && (
-            <p className="mt-3 text-xs text-yellow-500">
-              No preview available for this track — Spotify doesn&apos;t provide one.
-            </p>
+          {/* Spotify embed — key forces full remount on track change, which
+              triggers autoplay=1 for the new track. Only mounts after Start
+              is clicked so the browser sees it as user-initiated. */}
+          {currentTrackId ? (
+            <iframe
+              key={currentTrackId}
+              src={`https://open.spotify.com/embed/track/${currentTrackId}?autoplay=1&utm_source=generator`}
+              width="100%"
+              height="152"
+              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+              className="rounded-xl border-0"
+            />
+          ) : (
+            <div className="h-[152px] bg-gray-800 rounded-xl flex items-center justify-center">
+              <p className="text-gray-500 text-sm">Press Start Workout to begin</p>
+            </div>
           )}
 
-          {/* Current segment callout */}
           {currentSegment && isPlaying && (
             <div className="mt-4 p-3 bg-green-900/30 border border-green-700 rounded-xl">
               <p className="text-green-300 text-sm font-medium">
