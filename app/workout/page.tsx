@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo, Suspense } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import SegmentCard from '@/components/SegmentCard';
@@ -8,7 +8,6 @@ import WorkoutTimeline from '@/components/WorkoutTimeline';
 import StatsCard from '@/components/StatsCard';
 import { SpinClass } from '@/types/spotify';
 import { formatDuration } from '@/lib/workout-generator';
-import { useSpotifyEmbed } from '@/hooks/useSpotifyEmbed';
 
 function WorkoutContent() {
   const searchParams = useSearchParams();
@@ -18,8 +17,6 @@ function WorkoutContent() {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const lastPlayedIndexRef = useRef<number | null>(null);
-  const { containerRef, isReady, playTrack, pause } = useSpotifyEmbed();
 
   const spinClass = useMemo<SpinClass | null>(() => {
     if (!id) return null;
@@ -28,15 +25,12 @@ function WorkoutContent() {
   }, [id]);
 
   useEffect(() => {
-    if (!id || !spinClass) {
-      router.push('/dashboard');
-    }
+    if (!id || !spinClass) router.push('/dashboard');
   }, [id, router, spinClass]);
 
   // Workout timer
   useEffect(() => {
     if (!isPlaying || !spinClass) return;
-
     const interval = setInterval(() => {
       setElapsed((prev) => {
         const next = prev + 1;
@@ -44,30 +38,15 @@ function WorkoutContent() {
           setIsPlaying(false);
           return spinClass.totalDuration;
         }
-        const activeSegIdx = spinClass.segments.findIndex(
+        const idx = spinClass.segments.findIndex(
           (seg) => next >= seg.startTime && next < seg.startTime + seg.duration
         );
-        if (activeSegIdx !== -1) setActiveIndex(activeSegIdx);
+        if (idx !== -1) setActiveIndex(idx);
         return next;
       });
     }, 1000);
-
     return () => clearInterval(interval);
   }, [isPlaying, spinClass]);
-
-  // Play the current segment's track whenever it changes
-  useEffect(() => {
-    if (!isPlaying || activeIndex === null || !spinClass) return;
-    if (activeIndex === lastPlayedIndexRef.current) return;
-    lastPlayedIndexRef.current = activeIndex;
-    const uri = spinClass.segments[activeIndex]?.track?.uri;
-    if (uri) playTrack(uri);
-  }, [activeIndex, isPlaying, spinClass, playTrack]);
-
-  // Pause embed when workout is paused
-  useEffect(() => {
-    if (!isPlaying) pause();
-  }, [isPlaying, pause]);
 
   if (!spinClass) {
     return (
@@ -82,16 +61,18 @@ function WorkoutContent() {
   const progressPct = (elapsed / totalDuration) * 100;
   const currentSegment = activeIndex !== null ? segments[activeIndex] : null;
 
+  // Track ID driving the embed iframe. Only set once the workout starts so
+  // the iframe mounts for the first time inside the click handler's event,
+  // which satisfies the browser's autoplay policy.
+  const embedTrackId = activeIndex !== null ? segments[activeIndex].track.id : null;
+
   return (
     <div className="min-h-screen bg-gray-950">
       {/* Header */}
       <header className="border-b border-gray-800 bg-gray-950 sticky top-0 z-20">
         <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link
-              href="/dashboard"
-              className="text-gray-400 hover:text-white transition-colors p-1"
-            >
+            <Link href="/dashboard" className="text-gray-400 hover:text-white transition-colors p-1">
               ←
             </Link>
             <span className="text-white font-semibold truncate">{playlistName}</span>
@@ -115,7 +96,7 @@ function WorkoutContent() {
             </div>
             <div className="flex items-center gap-3">
               <button
-                onClick={() => { setElapsed(0); setActiveIndex(null); setIsPlaying(false); lastPlayedIndexRef.current = null; }}
+                onClick={() => { setElapsed(0); setActiveIndex(null); setIsPlaying(false); }}
                 className="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm transition-colors"
               >
                 Reset
@@ -124,17 +105,9 @@ function WorkoutContent() {
                 onClick={() => {
                   const starting = !isPlaying;
                   setIsPlaying((p) => !p);
-                  if (starting && spinClass) {
-                    // Must call playTrack synchronously inside the click handler
-                    // so the browser autoplay policy considers it user-initiated.
-                    const idx = activeIndex ?? 0;
-                    const uri = spinClass.segments[idx]?.track?.uri;
-                    if (uri) {
-                      playTrack(uri);
-                      lastPlayedIndexRef.current = idx;
-                      if (activeIndex === null) setActiveIndex(idx);
-                    }
-                  }
+                  // Set activeIndex synchronously inside the click so the iframe
+                  // mounts (with autoplay=1) while the user gesture is still active.
+                  if (starting && activeIndex === null) setActiveIndex(0);
                 }}
                 className={`px-6 py-2 rounded-full font-semibold text-sm transition-all ${
                   isPlaying
@@ -161,15 +134,22 @@ function WorkoutContent() {
             </div>
           </div>
 
-          {/* Spotify embed player — always rendered so the iframe can mount */}
-          <div className="relative rounded-xl overflow-hidden bg-gray-800 h-[152px]">
-            {!isReady && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <p className="text-gray-500 text-sm">Loading player…</p>
-              </div>
-            )}
-            <div ref={containerRef} className="w-full h-full" />
-          </div>
+          {/* Spotify embed — mounts only after Start is clicked; key forces a
+              full remount (and thus autoplay) whenever the track changes. */}
+          {embedTrackId ? (
+            <iframe
+              key={embedTrackId}
+              src={`https://open.spotify.com/embed/track/${embedTrackId}?utm_source=generator&autoplay=1`}
+              width="100%"
+              height="152"
+              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+              className="rounded-xl border-0"
+            />
+          ) : (
+            <div className="h-[152px] bg-gray-800 rounded-xl flex items-center justify-center">
+              <p className="text-gray-500 text-sm">Press Start Workout to begin</p>
+            </div>
+          )}
 
           {/* Current segment callout */}
           {currentSegment && isPlaying && (
