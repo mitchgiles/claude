@@ -111,6 +111,11 @@ function WorkoutContent() {
 
       <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
 
+        {/* DEBUG — remove once audio is confirmed working */}
+        <div className="bg-gray-800 text-xs text-gray-300 p-3 rounded-lg font-mono">
+          track[0] preview_url: <span className="text-yellow-400">{String(segments[0]?.track?.preview_url ?? 'NULL')}</span>
+        </div>
+
         {/* Workout controls */}
         <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6">
           <div className="flex items-center justify-between mb-4">
