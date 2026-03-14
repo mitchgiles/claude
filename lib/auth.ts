@@ -29,6 +29,14 @@ export async function getAccessToken(): Promise<string | null> {
     return refreshed.access_token;
   } catch (err) {
     console.error('Token refresh failed:', err);
+    // Clear stale refresh token so the next request redirects to login cleanly
+    try {
+      cookieStore.delete('spotify_refresh_token');
+      cookieStore.delete('spotify_access_token');
+      cookieStore.delete('spotify_expires_at');
+    } catch {
+      // ignore
+    }
     return null;
   }
 }

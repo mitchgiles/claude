@@ -53,6 +53,10 @@ export default function DashboardPage() {
     try {
       // 1. Fetch tracks
       const tracksRes = await fetch(`/api/spotify/tracks?playlistId=${playlist.id}`);
+      if (tracksRes.status === 401) {
+        window.location.href = '/?error=session_expired';
+        return;
+      }
       if (!tracksRes.ok) {
         const errData = await tracksRes.json().catch(() => ({}));
         throw new Error(errData.error || `Failed to fetch tracks (${tracksRes.status})`);
@@ -65,32 +69,37 @@ export default function DashboardPage() {
 
       if (tracks.length === 0) throw new Error('No tracks found in this playlist');
 
-      // 2. Fetch audio features
-      const ids = tracks.map((t) => t.id).join(',');
-      const featuresRes = await fetch(`/api/spotify/features?ids=${ids}`);
-      if (!featuresRes.ok) {
-        const errData = await featuresRes.json().catch(() => ({}));
-        throw new Error(errData.error || `Failed to fetch audio features (${featuresRes.status})`);
+      // 2. Fetch audio features (optional — deprecated for some Spotify apps)
+      let featuresMap = new Map<string, AudioFeatures>();
+      try {
+        const ids = tracks.map((t) => t.id).join(',');
+        const featuresRes = await fetch(`/api/spotify/features?ids=${ids}`);
+        if (featuresRes.ok) {
+          const featuresData = await featuresRes.json();
+          featuresMap = new Map<string, AudioFeatures>(
+            (featuresData.audio_features as AudioFeatures[])
+              .filter(Boolean)
+              .map((f) => [f.id, f])
+          );
+        } else {
+          console.warn('Audio features unavailable, generating workout without BPM data');
+        }
+      } catch {
+        console.warn('Audio features fetch failed, generating workout without BPM data');
       }
-      const featuresData = await featuresRes.json();
 
-      const featuresMap = new Map<string, AudioFeatures>(
-        (featuresData.audio_features as AudioFeatures[])
-          .filter(Boolean)
-          .map((f) => [f.id, f])
-      );
-
-      // 3. Combine tracks with features, filter out any missing
+      // 3. Combine tracks with features; fall back to tracks without features
       const tracksWithFeatures = tracks
         .map((track) => ({ track, features: featuresMap.get(track.id) }))
         .filter((t): t is { track: SpotifyTrack; features: AudioFeatures } => !!t.features);
 
-      if (tracksWithFeatures.length === 0) {
-        throw new Error('Audio features not available for these tracks');
-      }
+      const inputTracks = tracksWithFeatures.length > 0 ? tracksWithFeatures : tracks.map((track) => ({
+        track,
+        features: { id: track.id, tempo: 128, energy: 0.7, valence: 0.5, danceability: 0.6 } as AudioFeatures,
+      }));
 
       // 4. Generate spin class
-      const generated = generateSpinClass(tracksWithFeatures, playlist.name);
+      const generated = generateSpinClass(inputTracks, playlist.name);
       setSpinClass(generated);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');

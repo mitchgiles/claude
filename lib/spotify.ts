@@ -69,7 +69,8 @@ export async function refreshAccessToken(refreshToken: string): Promise<{
   });
 
   if (!res.ok) {
-    throw new Error(`Token refresh failed: ${res.statusText}`);
+    const body = await res.json().catch(() => ({}));
+    throw new Error(`Token refresh failed: ${body.error_description || body.error || res.statusText}`);
   }
   return res.json();
 }
