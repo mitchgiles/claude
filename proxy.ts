@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const CUSTOM_DOMAIN = 'www.euroscrubby-wholesale.com';
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const host = req.headers.get('host') ?? '';
   if (host && host !== CUSTOM_DOMAIN && !host.startsWith('localhost')) {
     const url = req.nextUrl.clone();
