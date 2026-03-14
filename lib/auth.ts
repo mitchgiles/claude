@@ -55,15 +55,6 @@ export async function getAccessToken(rawCookies?: {
     return refreshed.access_token;
   } catch (err) {
     console.error('Token refresh failed:', err);
-    // Only clear cookies via next/headers — never via req.cookies which clears the browser
-    try {
-      const store = await cookies();
-      store.delete('spotify_refresh_token');
-      store.delete('spotify_access_token');
-      store.delete('spotify_expires_at');
-    } catch {
-      // ignore
-    }
     return null;
   }
 }
