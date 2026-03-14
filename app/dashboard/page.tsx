@@ -127,12 +127,12 @@ export default function DashboardPage() {
             <span className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center text-base">🚴</span>
             SpinSync
           </Link>
-          <Link
+          <a
             href="/api/auth/logout"
             className="text-gray-400 hover:text-white text-sm transition-colors"
           >
             Log out
-          </Link>
+          </a>
         </div>
       </header>
 

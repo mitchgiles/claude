@@ -81,9 +81,9 @@ function WorkoutContent() {
             <span className="text-white font-semibold truncate">{playlistName}</span>
           </div>
           <div className="flex items-center gap-2">
-            <Link href="/api/auth/logout" className="text-gray-500 hover:text-white text-sm transition-colors">
+            <a href="/api/auth/logout" className="text-gray-500 hover:text-white text-sm transition-colors">
               Log out
-            </Link>
+            </a>
           </div>
         </div>
       </header>
