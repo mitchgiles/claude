@@ -25,17 +25,7 @@ export async function GET(req: NextRequest) {
     const expiresAt = Date.now() + tokens.expires_in * 1000;
     const prod = process.env.NODE_ENV === 'production';
 
-    const response = new NextResponse(
-      `<!doctype html><html><head>
-        <meta http-equiv="refresh" content="0;url=/dashboard">
-        <style>body{font-family:sans-serif;background:#0a0a0a;color:#ccc;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}</style>
-      </head><body>
-        <p>✅ Authenticated — redirecting to dashboard…</p>
-        <script>setTimeout(()=>window.location.replace('/dashboard'),100)</script>
-      </body></html>`,
-      { status: 200, headers: { 'Content-Type': 'text/html' } }
-    );
-
+    const response = NextResponse.redirect(new URL('/dashboard', req.url));
     response.cookies.set('spotify_access_token', tokens.access_token, COOKIE_OPTS(tokens.expires_in, prod));
     response.cookies.set('spotify_refresh_token', tokens.refresh_token, COOKIE_OPTS(60 * 60 * 24 * 30, prod));
     response.cookies.set('spotify_expires_at', String(expiresAt), COOKIE_OPTS(60 * 60 * 24 * 30, prod));
