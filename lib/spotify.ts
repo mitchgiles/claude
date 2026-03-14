@@ -80,7 +80,9 @@ async function spotifyFetch(endpoint: string, token: string) {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
-    throw new Error(`Spotify API error: ${res.status} ${res.statusText}`);
+    const body = await res.json().catch(() => null);
+    const detail = body?.error?.message ?? body?.error ?? res.statusText;
+    throw new Error(`Spotify API error: ${res.status} ${detail}`);
   }
   return res.json();
 }
@@ -96,7 +98,7 @@ export async function getPlaylistTracks(
   offset = 0
 ) {
   return spotifyFetch(
-    `/playlists/${playlistId}/tracks?limit=${limit}&offset=${offset}&fields=items(track(id,name,artists,album,duration_ms,uri,preview_url)),total,next`,
+    `/playlists/${playlistId}/tracks?limit=${limit}&offset=${offset}&fields=items(track(id,name,artists,album,duration_ms,uri)),total,next`,
     token
   );
 }
