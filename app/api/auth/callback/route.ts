@@ -1,9 +1,13 @@
 import { exchangeCodeForTokens } from '@/lib/spotify';
 import { NextRequest, NextResponse } from 'next/server';
 
-function setCookie(name: string, value: string, maxAge: number, secure: boolean) {
-  return `${name}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure ? '; Secure' : ''}`;
-}
+const COOKIE_OPTS = (maxAge: number) => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: 'lax' as const,
+  path: '/',
+  maxAge,
+});
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -19,17 +23,17 @@ export async function GET(req: NextRequest) {
   try {
     const tokens = await exchangeCodeForTokens(code);
     const expiresAt = Date.now() + tokens.expires_in * 1000;
-    const secure = process.env.NODE_ENV === 'production';
 
-    const origin = process.env.NEXTAUTH_URL || `${new URL(req.url).origin}`;
-    const headers = new Headers({
-      'Location': `${origin}/dashboard`,
-    });
-    headers.append('Set-Cookie', setCookie('spotify_access_token', tokens.access_token, tokens.expires_in, secure));
-    headers.append('Set-Cookie', setCookie('spotify_refresh_token', tokens.refresh_token, 60 * 60 * 24 * 30, secure));
-    headers.append('Set-Cookie', setCookie('spotify_expires_at', String(expiresAt), 60 * 60 * 24 * 30, secure));
+    const redirectUrl = process.env.NEXTAUTH_URL
+      ? `${process.env.NEXTAUTH_URL}/dashboard`
+      : new URL('/dashboard', req.url).toString();
 
-    return new Response(null, { status: 302, headers });
+    const response = NextResponse.redirect(redirectUrl);
+    response.cookies.set('spotify_access_token', tokens.access_token, COOKIE_OPTS(tokens.expires_in));
+    response.cookies.set('spotify_refresh_token', tokens.refresh_token, COOKIE_OPTS(60 * 60 * 24 * 30));
+    response.cookies.set('spotify_expires_at', String(expiresAt), COOKIE_OPTS(60 * 60 * 24 * 30));
+
+    return response;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('Auth callback error:', msg);
