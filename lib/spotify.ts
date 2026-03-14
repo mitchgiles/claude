@@ -80,8 +80,15 @@ async function spotifyFetch(endpoint: string, token: string) {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    const detail = body?.error?.message ?? body?.error ?? res.statusText;
+    const raw = await res.text().catch(() => '');
+    let detail: string;
+    try {
+      const body = JSON.parse(raw);
+      detail = body?.error?.message ?? body?.error ?? res.statusText;
+    } catch {
+      detail = raw.slice(0, 200) || res.statusText;
+    }
+    console.error(`Spotify ${res.status} on ${endpoint}:`, raw.slice(0, 500));
     throw new Error(`Spotify API error: ${res.status} ${detail}`);
   }
   return res.json();
