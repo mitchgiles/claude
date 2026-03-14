@@ -70,8 +70,9 @@ export default function DashboardPage() {
       }
       const tracksData = await tracksRes.json();
 
+      // /items endpoint returns { item: track } (not { track: track })
       const tracks: SpotifyTrack[] = tracksData.items
-        .map((item: { track: SpotifyTrack }) => item.track)
+        .map((item: { item?: SpotifyTrack; track?: SpotifyTrack }) => item.item ?? item.track)
         .filter((t: SpotifyTrack | null) => t && t.id && (t as { type?: string }).type !== 'episode');
 
       if (tracks.length === 0) throw new Error('No tracks found in this playlist');
