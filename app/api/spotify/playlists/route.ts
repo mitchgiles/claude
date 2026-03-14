@@ -3,7 +3,7 @@ import { getAccessToken } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(req: NextRequest) {
-  const token = await getAccessToken();
+  const token = await getAccessToken(req.cookies);
   if (!token) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

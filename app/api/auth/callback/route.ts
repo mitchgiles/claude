@@ -2,7 +2,7 @@ import { exchangeCodeForTokens } from '@/lib/spotify';
 import { NextRequest, NextResponse } from 'next/server';
 
 function setCookie(name: string, value: string, maxAge: number, secure: boolean) {
-  return `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure ? '; Secure' : ''}`;
+  return `${name}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure ? '; Secure' : ''}`;
 }
 
 export async function GET(req: NextRequest) {
