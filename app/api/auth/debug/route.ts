@@ -1,49 +1,53 @@
 import { cookies } from 'next/headers';
-import { NextResponse } from 'next/server';
+import { getAccessToken } from '@/lib/auth';
+import { NextRequest, NextResponse } from 'next/server';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  // Read via cookies() from next/headers
   const cookieStore = await cookies();
   const accessToken = cookieStore.get('spotify_access_token')?.value;
   const refreshToken = cookieStore.get('spotify_refresh_token')?.value;
   const expiresAt = cookieStore.get('spotify_expires_at')?.value;
 
-  const state = {
-    has_access_token: !!accessToken,
-    has_refresh_token: !!refreshToken,
-    has_expires_at: !!expiresAt,
-    expires_at_ms: expiresAt ? Number(expiresAt) : null,
-    expires_in_seconds: expiresAt ? Math.round((Number(expiresAt) - Date.now()) / 1000) : null,
-    client_id_set: !!process.env.SPOTIFY_CLIENT_ID,
-    client_secret_set: !!process.env.SPOTIFY_CLIENT_SECRET,
-    redirect_uri: process.env.SPOTIFY_REDIRECT_URI,
-    refresh_result: null as string | null,
-  };
+  // Read via req.cookies (what Route Handlers now use)
+  const reqAccessToken = req.cookies.get('spotify_access_token')?.value;
+  const reqRefreshToken = req.cookies.get('spotify_refresh_token')?.value;
+  const reqExpiresAt = req.cookies.get('spotify_expires_at')?.value;
 
-  if (refreshToken) {
+  // Call getAccessToken with req.cookies (same as playlists/tracks routes)
+  const tokenFromReqCookies = await getAccessToken(req.cookies);
+
+  // Test the token against Spotify if we have one
+  let spotifyMeStatus: number | string | null = null;
+  const tokenToTest = tokenFromReqCookies ?? accessToken;
+  if (tokenToTest) {
     try {
-      const credentials = Buffer.from(
-        `${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`
-      ).toString('base64');
-      const res = await fetch('https://accounts.spotify.com/api/token', {
-        method: 'POST',
-        headers: {
-          Authorization: `Basic ${credentials}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshToken }),
+      const res = await fetch('https://api.spotify.com/v1/me', {
+        headers: { Authorization: `Bearer ${tokenToTest}` },
       });
-      const body = await res.json();
-      if (res.ok) {
-        state.refresh_result = 'success';
-      } else {
-        state.refresh_result = `failed: ${body.error} — ${body.error_description}`;
-      }
+      spotifyMeStatus = res.status;
     } catch (e) {
-      state.refresh_result = `fetch error: ${e instanceof Error ? e.message : String(e)}`;
+      spotifyMeStatus = `fetch error: ${e instanceof Error ? e.message : String(e)}`;
     }
-  } else {
-    state.refresh_result = 'no refresh token to test';
   }
+
+  const state = {
+    // via cookies() from next/headers
+    nextHeaders_has_access_token: !!accessToken,
+    nextHeaders_has_refresh_token: !!refreshToken,
+    nextHeaders_has_expires_at: !!expiresAt,
+    // via req.cookies
+    reqCookies_has_access_token: !!reqAccessToken,
+    reqCookies_has_refresh_token: !!reqRefreshToken,
+    reqCookies_has_expires_at: !!reqExpiresAt,
+    // getAccessToken result
+    getAccessToken_returned_token: !!tokenFromReqCookies,
+    expires_in_seconds: expiresAt ? Math.round((Number(expiresAt) - Date.now()) / 1000) : null,
+    // Spotify API test
+    spotify_me_status: spotifyMeStatus,
+    client_id_set: !!process.env.SPOTIFY_CLIENT_ID,
+    redirect_uri: process.env.SPOTIFY_REDIRECT_URI,
+  };
 
   return NextResponse.json(state);
 }
