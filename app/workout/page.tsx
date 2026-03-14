@@ -56,10 +56,12 @@ function WorkoutContent() {
     return () => clearInterval(interval);
   }, [isPlaying, spinClass]);
 
-  // Trigger Spotify playback whenever the active segment changes
+  // Trigger Spotify playback whenever the active segment changes.
+  // Also re-triggers when deviceId first becomes available (SDK connects
+  // after workout has already started).
   useEffect(() => {
-    if (!isPlaying || activeIndex === null || activeIndex === lastPlayedIndexRef.current) return;
-    if (!spinClass) return;
+    if (!isPlaying || activeIndex === null || !deviceId || !spinClass) return;
+    if (activeIndex === lastPlayedIndexRef.current) return;
     lastPlayedIndexRef.current = activeIndex;
     const uri = spinClass.segments[activeIndex]?.track?.uri;
     if (!uri) return;
@@ -69,7 +71,7 @@ function WorkoutContent() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ uri, deviceId }),
     }).catch(() => {});
-  }, [activeIndex, isPlaying, spinClass]);
+  }, [activeIndex, isPlaying, deviceId, spinClass]);
 
   if (!spinClass) {
     return (

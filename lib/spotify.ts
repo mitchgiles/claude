@@ -142,16 +142,14 @@ export async function startPlayback(token: string, trackUri: string) {
 }
 
 // /recommendations is unavailable for new apps (deprecated Nov 2024).
-// Use /search with a genre: filter instead.
+// The genre: filter in /search only works for artists, not tracks — use a
+// plain keyword search instead.
 export async function searchTracksByGenre(token: string, genre: string, limit = 20) {
-  // "work-out" is not a searchable genre; use a keyword query instead.
-  const q = genre === 'work-out' ? 'workout' : `genre:${genre}`;
+  const keyword = genre.replace(/-/g, ' ');
   const params = new URLSearchParams({
-    q,
+    q: `${keyword} music`,
     type: 'track',
     limit: String(Math.min(limit, 50)),
-    // market=from_token is not accepted by /search; authenticated requests
-    // are automatically scoped to the user's market
   });
   return spotifyFetch(`/search?${params}`, token);
 }
