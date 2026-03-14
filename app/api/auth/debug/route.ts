@@ -14,8 +14,12 @@ export async function GET(req: NextRequest) {
   const reqRefreshToken = req.cookies.get('spotify_refresh_token')?.value;
   const reqExpiresAt = req.cookies.get('spotify_expires_at')?.value;
 
-  // Call getAccessToken with req.cookies (same as playlists/tracks routes)
-  const tokenFromReqCookies = await getAccessToken(req.cookies);
+  // Call getAccessToken with raw values (same as playlists/tracks routes)
+  const tokenFromReqCookies = await getAccessToken({
+    accessToken: reqAccessToken,
+    refreshToken: reqRefreshToken,
+    expiresAt: reqExpiresAt,
+  });
 
   // Test the token against Spotify if we have one
   let spotifyMeStatus: number | string | null = null;
