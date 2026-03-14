@@ -8,6 +8,7 @@ import WorkoutTimeline from '@/components/WorkoutTimeline';
 import StatsCard from '@/components/StatsCard';
 import { SpinClass } from '@/types/spotify';
 import { formatDuration } from '@/lib/workout-generator';
+import { useSpotifyPlayer } from '@/hooks/useSpotifyPlayer';
 
 function WorkoutContent() {
   const searchParams = useSearchParams();
@@ -17,8 +18,8 @@ function WorkoutContent() {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [noDevice, setNoDevice] = useState(false);
   const lastPlayedIndexRef = useRef<number | null>(null);
+  const { deviceId, isReady, error: playerError } = useSpotifyPlayer();
 
   const spinClass = useMemo<SpinClass | null>(() => {
     if (!id) return null;
@@ -66,10 +67,7 @@ function WorkoutContent() {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ uri }),
-    }).then((res) => {
-      if (res.status === 404) setNoDevice(true);
-      else setNoDevice(false);
+      body: JSON.stringify({ uri, deviceId }),
     }).catch(() => {});
   }, [activeIndex, isPlaying, spinClass]);
 
@@ -151,12 +149,15 @@ function WorkoutContent() {
             </div>
           </div>
 
-          {/* No active Spotify device warning */}
-          {noDevice && isPlaying && (
-            <div className="mt-3 p-3 bg-yellow-900/30 border border-yellow-700 rounded-xl">
-              <p className="text-yellow-300 text-sm">
-                No active Spotify device found. Open Spotify on any device, play something briefly, then resume here.
-              </p>
+          {/* Spotify player status */}
+          {playerError && (
+            <div className="mt-3 p-3 bg-red-900/30 border border-red-700 rounded-xl">
+              <p className="text-red-300 text-sm">{playerError}</p>
+            </div>
+          )}
+          {!playerError && !isReady && (
+            <div className="mt-3 p-3 bg-gray-800 border border-gray-700 rounded-xl">
+              <p className="text-gray-400 text-sm">Connecting Spotify player…</p>
             </div>
           )}
 

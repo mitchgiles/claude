@@ -9,6 +9,7 @@ export const SCOPES = [
   'user-library-read',
   'user-modify-playback-state',
   'user-read-playback-state',
+  'streaming',
 ].join(' ');
 
 export function getAuthUrl(): string {

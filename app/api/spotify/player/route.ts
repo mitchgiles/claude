@@ -1,21 +1,30 @@
-import { startPlayback } from '@/lib/spotify';
 import { getAccessToken } from '@/lib/auth';
 import { NextRequest, NextResponse } from 'next/server';
+
+const SPOTIFY_BASE_URL = 'https://api.spotify.com/v1';
 
 export async function POST(req: NextRequest) {
   const token = await getAccessToken();
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { uri } = await req.json().catch(() => ({}));
+  const { uri, deviceId } = await req.json().catch(() => ({}));
   if (!uri) return NextResponse.json({ error: 'Missing uri' }, { status: 400 });
 
-  try {
-    await startPlayback(token, uri);
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Playback failed';
-    // 404 from Spotify = no active device; surface it distinctly
-    const status = msg.includes('404') ? 404 : 500;
-    return NextResponse.json({ error: msg }, { status });
-  }
+  const url = deviceId
+    ? `${SPOTIFY_BASE_URL}/me/player/play?device_id=${deviceId}`
+    : `${SPOTIFY_BASE_URL}/me/player/play`;
+
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ uris: [uri] }),
+  });
+
+  if (res.status === 204 || res.status === 202) return NextResponse.json({ ok: true });
+  const raw = await res.text().catch(() => '');
+  const status = res.status === 404 ? 404 : 500;
+  return NextResponse.json({ error: `Spotify ${res.status}: ${raw.slice(0, 200)}` }, { status });
 }
