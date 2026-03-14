@@ -1,13 +1,9 @@
 import { exchangeCodeForTokens } from '@/lib/spotify';
 import { NextRequest, NextResponse } from 'next/server';
 
-const COOKIE_OPTS = (maxAge: number, prod: boolean) => ({
-  httpOnly: true,
-  secure: prod,
-  sameSite: 'lax' as const,
-  path: '/',
-  maxAge,
-});
+function setCookie(name: string, value: string, maxAge: number, secure: boolean) {
+  return `${name}=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure ? '; Secure' : ''}`;
+}
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -23,14 +19,17 @@ export async function GET(req: NextRequest) {
   try {
     const tokens = await exchangeCodeForTokens(code);
     const expiresAt = Date.now() + tokens.expires_in * 1000;
-    const prod = process.env.NODE_ENV === 'production';
+    const secure = process.env.NODE_ENV === 'production';
 
-    const response = NextResponse.redirect(new URL('/dashboard', req.url));
-    response.cookies.set('spotify_access_token', tokens.access_token, COOKIE_OPTS(tokens.expires_in, prod));
-    response.cookies.set('spotify_refresh_token', tokens.refresh_token, COOKIE_OPTS(60 * 60 * 24 * 30, prod));
-    response.cookies.set('spotify_expires_at', String(expiresAt), COOKIE_OPTS(60 * 60 * 24 * 30, prod));
+    const origin = process.env.NEXTAUTH_URL || `${new URL(req.url).origin}`;
+    const headers = new Headers({
+      'Location': `${origin}/dashboard`,
+    });
+    headers.append('Set-Cookie', setCookie('spotify_access_token', tokens.access_token, tokens.expires_in, secure));
+    headers.append('Set-Cookie', setCookie('spotify_refresh_token', tokens.refresh_token, 60 * 60 * 24 * 30, secure));
+    headers.append('Set-Cookie', setCookie('spotify_expires_at', String(expiresAt), 60 * 60 * 24 * 30, secure));
 
-    return response;
+    return new Response(null, { status: 302, headers });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('Auth callback error:', msg);
