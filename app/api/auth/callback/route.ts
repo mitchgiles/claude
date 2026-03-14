@@ -24,11 +24,10 @@ export async function GET(req: NextRequest) {
     const tokens = await exchangeCodeForTokens(code);
     const expiresAt = Date.now() + tokens.expires_in * 1000;
 
-    const redirectUrl = process.env.NEXTAUTH_URL
-      ? `${process.env.NEXTAUTH_URL}/dashboard`
-      : new URL('/dashboard', req.url).toString();
+    // DEBUG: redirect to debug endpoint to confirm cookies are set immediately post-login
+    const debugUrl = new URL('/api/auth/debug', req.url).toString();
 
-    const response = NextResponse.redirect(redirectUrl);
+    const response = NextResponse.redirect(debugUrl);
     response.cookies.set('spotify_access_token', tokens.access_token, COOKIE_OPTS(tokens.expires_in));
     response.cookies.set('spotify_refresh_token', tokens.refresh_token, COOKIE_OPTS(60 * 60 * 24 * 30));
     response.cookies.set('spotify_expires_at', String(expiresAt), COOKIE_OPTS(60 * 60 * 24 * 30));
