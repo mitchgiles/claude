@@ -10,7 +10,11 @@ export async function GET(req: NextRequest) {
   if (!token) {
     return NextResponse.json({
       error: 'Unauthorized',
-      debug: { hasAt: !!at, hasRt: !!rt, hasEa: !!ea, ea, dateNow: Date.now() },
+      debug: {
+        hasAt: !!at, hasRt: !!rt, hasEa: !!ea, ea, dateNow: Date.now(),
+        rawCookieHeader: req.headers.get('cookie'),
+        allCookieNames: req.cookies.getAll().map(c => c.name),
+      },
     }, { status: 401 });
   }
 
