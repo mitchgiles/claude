@@ -142,14 +142,15 @@ export async function startPlayback(token: string, trackUri: string) {
 
 // /recommendations is unavailable for new apps (deprecated Nov 2024).
 // Use /search with a genre: filter instead.
-export async function searchTracksByGenre(token: string, genre: string, limit = 50) {
+export async function searchTracksByGenre(token: string, genre: string, limit = 20) {
   // "work-out" is not a searchable genre; use a keyword query instead.
   const q = genre === 'work-out' ? 'workout' : `genre:${genre}`;
   const params = new URLSearchParams({
     q,
     type: 'track',
     limit: String(Math.min(limit, 50)),
-    market: 'from_token',
+    // market=from_token is not accepted by /search; authenticated requests
+    // are automatically scoped to the user's market
   });
   return spotifyFetch(`/search?${params}`, token);
 }
