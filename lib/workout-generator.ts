@@ -103,13 +103,27 @@ function getIntensityEmoji(intensity: WorkoutIntensity): string {
 
 export function generateSpinClass(
   tracks: TrackWithFeatures[],
-  playlistName: string
+  playlistName: string,
+  targetDuration?: number // seconds; if provided, selects tracks to fill ±2 min
 ): SpinClass {
-  const totalTracks = tracks.length;
+  // Select tracks to match the target duration (greedy: add until within window)
+  let selected = tracks;
+  if (targetDuration != null && tracks.length > 0) {
+    const minTarget = targetDuration - 120; // −2 min
+    selected = [];
+    let accumulated = 0;
+    for (const t of tracks) {
+      selected.push(t);
+      accumulated += Math.round(t.track.duration_ms / 1000);
+      if (accumulated >= minTarget) break;
+    }
+  }
+
+  const totalTracks = selected.length;
   const segments: WorkoutSegment[] = [];
   let currentTime = 0;
 
-  tracks.forEach(({ track, features }, index) => {
+  selected.forEach(({ track, features }, index) => {
     let position: 'start' | 'end' | 'middle' = 'middle';
     if (index === 0) position = 'start';
     else if (index === totalTracks - 1) position = 'end';
@@ -135,9 +149,9 @@ export function generateSpinClass(
 
   const totalDuration = currentTime;
   const avgBPM =
-    Math.round(tracks.reduce((sum, t) => sum + t.features.tempo, 0) / tracks.length);
+    Math.round(selected.reduce((sum, t) => sum + t.features.tempo, 0) / selected.length);
   const avgEnergy =
-    tracks.reduce((sum, t) => sum + t.features.energy, 0) / tracks.length;
+    selected.reduce((sum, t) => sum + t.features.energy, 0) / selected.length;
 
   const peakSegment = segments.reduce((max, s) =>
     s.features.energy > max.features.energy ? s : max

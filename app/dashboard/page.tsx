@@ -31,7 +31,9 @@ export default function DashboardPage() {
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [genreError, setGenreError] = useState<string | null>(null);
+  const [workoutLength, setWorkoutLength] = useState(45);
   const LIMIT = 20;
+  const LENGTH_OPTIONS = [30, 45, 60];
 
   // After the list loads, backfill track counts individually since /me/playlists
   // no longer returns tracks.total in simplified playlist objects.
@@ -156,7 +158,7 @@ export default function DashboardPage() {
       }));
 
       // 4. Generate spin class
-      const generated = generateSpinClass(inputTracks, playlist.name);
+      const generated = generateSpinClass(inputTracks, playlist.name, workoutLength * 60);
       setSpinClass(generated);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
@@ -222,7 +224,7 @@ export default function DashboardPage() {
         } as AudioFeatures,
       }));
 
-      const generated = generateSpinClass(tracksWithFeatures, syntheticPlaylist.name);
+      const generated = generateSpinClass(tracksWithFeatures, syntheticPlaylist.name, workoutLength * 60);
       setSpinClass(generated);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
@@ -252,6 +254,26 @@ export default function DashboardPage() {
       <div className="max-w-7xl mx-auto px-4 py-8 flex gap-6 flex-col lg:flex-row">
         {/* Playlist sidebar */}
         <aside className="w-full lg:w-80 flex-shrink-0">
+          {/* Workout length selector */}
+          <div className="mb-5">
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Workout length</p>
+            <div className="flex gap-2">
+              {LENGTH_OPTIONS.map((min) => (
+                <button
+                  key={min}
+                  onClick={() => setWorkoutLength(min)}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors border ${
+                    workoutLength === min
+                      ? 'bg-green-600 text-white border-green-500'
+                      : 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700 hover:text-white'
+                  }`}
+                >
+                  {min} min
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Genre-based random playlist */}
           <div className="mb-5">
             <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Generate by genre</p>
