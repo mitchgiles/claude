@@ -22,6 +22,8 @@ function WorkoutContent() {
   const lastPlayedIndex = useRef<number | null>(null);
 
   const { deviceId, isReady, error: sdkError, isMobile } = useSpotifyPlayer();
+  // On mobile we resolve the Connect device id once at start time
+  const mobileDeviceId = useRef<string | null>(null);
 
   const spinClass = useMemo<SpinClass | null>(() => {
     if (!id) return null;
@@ -33,13 +35,39 @@ function WorkoutContent() {
     if (!id || !spinClass) router.push('/dashboard');
   }, [id, router, spinClass]);
 
+  // Fetch available Spotify Connect devices and return the first device id.
+  const resolveConnectDevice = async (): Promise<string | null> => {
+    try {
+      const res = await fetch('/api/spotify/devices');
+      if (!res.ok) return null;
+      const data = await res.json();
+      const devices: Array<{ id: string; name: string; is_active: boolean }> =
+        data.devices ?? [];
+      if (devices.length === 0) return null;
+      // Prefer the active device; fall back to the first available one.
+      return (devices.find((d) => d.is_active) ?? devices[0]).id;
+    } catch {
+      return null;
+    }
+  };
+
   const playTrack = async (trackUri: string) => {
     setPlaybackError(null);
     try {
       const body: Record<string, string> = { uri: trackUri };
-      // Desktop: target the SDK virtual device. Mobile: omit deviceId so
-      // Spotify targets whichever Connect device is currently active.
-      if (deviceId) body.deviceId = deviceId;
+
+      if (deviceId) {
+        // Desktop SDK virtual device
+        body.deviceId = deviceId;
+      } else if (isMobile) {
+        // Mobile: use cached device id, or resolve it now
+        if (!mobileDeviceId.current) {
+          mobileDeviceId.current = await resolveConnectDevice();
+        }
+        if (mobileDeviceId.current) {
+          body.deviceId = mobileDeviceId.current;
+        }
+      }
 
       const res = await fetch('/api/spotify/player', {
         method: 'POST',
@@ -48,13 +76,13 @@ function WorkoutContent() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        const msg = data.error ?? `Playback error (${res.status})`;
-        // 404 on mobile = no active Spotify device
-        setPlaybackError(
-          res.status === 404 && isMobile
-            ? 'Open the Spotify app first, then press Start Workout.'
-            : msg
-        );
+        if (res.status === 404 && isMobile) {
+          // Device disappeared — clear cache and tell user to re-open Spotify
+          mobileDeviceId.current = null;
+          setPlaybackError('No Spotify device found. Open the Spotify app, play something briefly, then press Start.');
+        } else {
+          setPlaybackError(data.error ?? `Playback error (${res.status})`);
+        }
       }
     } catch (e) {
       setPlaybackError(String(e));
@@ -181,7 +209,7 @@ function WorkoutContent() {
           {/* Mobile hint */}
           {isMobile && !isPlaying && !playbackError && (
             <div className="mb-3 p-3 bg-blue-900/30 border border-blue-700 rounded-xl text-blue-300 text-xs">
-              Open the Spotify app on your phone before pressing Start — music will play there while you follow the workout here.
+              Open Spotify, play any song briefly so it registers as a device, then come back and press Start.
             </div>
           )}
 
