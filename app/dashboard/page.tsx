@@ -33,7 +33,7 @@ export default function DashboardPage() {
   const [genreError, setGenreError] = useState<string | null>(null);
   const [workoutLength, setWorkoutLength] = useState(45);
   const LIMIT = 20;
-  const LENGTH_OPTIONS = [30, 45, 60];
+  const LENGTH_OPTIONS = [20, 30, 45, 60];
 
   // After the list loads, backfill track counts individually since /me/playlists
   // no longer returns tracks.total in simplified playlist objects.
