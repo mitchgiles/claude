@@ -144,13 +144,15 @@ export async function startPlayback(token: string, trackUri: string) {
 // /recommendations is unavailable for new apps (deprecated Nov 2024).
 // The genre: filter in /search only works for artists, not tracks — use a
 // plain keyword search instead.
-export async function searchTracksByGenre(token: string, genre: string) {
+// Note: Spotify new-app restrictions reject an explicit `limit` param (400),
+// so we rely on the default (20 per page) and use `offset` for pagination.
+export async function searchTracksByGenre(token: string, genre: string, offset = 0) {
   const keyword = genre.replace(/-/g, ' ');
   const params = new URLSearchParams({
     q: `${keyword} music`,
     type: 'track',
     market: 'from_token',
-    limit: '50',
   });
+  if (offset > 0) params.set('offset', String(offset));
   return spotifyFetch(`/search?${params}`, token);
 }
