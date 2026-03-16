@@ -21,7 +21,7 @@ function WorkoutContent() {
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const lastPlayedIndex = useRef<number | null>(null);
 
-  const { deviceId, isReady, error: sdkError } = useSpotifyPlayer();
+  const { deviceId, isReady, error: sdkError, isMobile } = useSpotifyPlayer();
 
   const spinClass = useMemo<SpinClass | null>(() => {
     if (!id) return null;
@@ -33,19 +33,28 @@ function WorkoutContent() {
     if (!id || !spinClass) router.push('/dashboard');
   }, [id, router, spinClass]);
 
-  // Play a track on the SDK device
   const playTrack = async (trackUri: string) => {
-    if (!deviceId) return;
     setPlaybackError(null);
     try {
+      const body: Record<string, string> = { uri: trackUri };
+      // Desktop: target the SDK virtual device. Mobile: omit deviceId so
+      // Spotify targets whichever Connect device is currently active.
+      if (deviceId) body.deviceId = deviceId;
+
       const res = await fetch('/api/spotify/player', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uri: trackUri, deviceId }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setPlaybackError(data.error ?? `Playback error (${res.status})`);
+        const msg = data.error ?? `Playback error (${res.status})`;
+        // 404 on mobile = no active Spotify device
+        setPlaybackError(
+          res.status === 404 && isMobile
+            ? 'Open the Spotify app first, then press Start Workout.'
+            : msg
+        );
       }
     } catch (e) {
       setPlaybackError(String(e));
@@ -94,35 +103,35 @@ function WorkoutContent() {
   const progressPct = (elapsed / totalDuration) * 100;
   const currentSegment = activeIndex !== null ? segments[activeIndex] : null;
 
-  const playerReady = isReady && !!deviceId;
-  const playerStatus = sdkError
+  const canStart = isReady && !sdkError;
+  const statusMsg = sdkError
     ? sdkError
-    : !playerReady
+    : !isReady
     ? 'Connecting to Spotify…'
     : null;
 
   return (
     <div className="min-h-screen bg-gray-950">
       <header className="border-b border-gray-800 bg-gray-950 sticky top-0 z-20">
-        <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link href="/dashboard" className="text-gray-400 hover:text-white transition-colors p-1">←</Link>
-            <span className="text-white font-semibold truncate">{playlistName}</span>
+        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-2 min-w-0">
+            <Link href="/dashboard" className="text-gray-400 hover:text-white p-1 shrink-0">←</Link>
+            <span className="text-white font-semibold truncate text-sm sm:text-base">{playlistName}</span>
           </div>
-          <a href="/api/auth/logout" className="text-gray-500 hover:text-white text-sm transition-colors">Log out</a>
+          <a href="/api/auth/logout" className="text-gray-500 hover:text-white text-sm shrink-0 ml-2">Log out</a>
         </div>
       </header>
 
-      <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
+      <div className="max-w-5xl mx-auto px-3 sm:px-4 py-4 sm:py-8 space-y-4 sm:space-y-8">
 
         {/* Workout controls */}
-        <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6">
-          <div className="flex items-center justify-between mb-4">
+        <div className="bg-gray-900 border border-gray-700 rounded-2xl p-4 sm:p-6">
+          <div className="flex items-start justify-between gap-3 mb-4">
             <div>
-              <h1 className="text-2xl font-bold text-white">Spin Class</h1>
-              <p className="text-gray-400">{segments.length} tracks • {minutes} minutes</p>
+              <h1 className="text-xl sm:text-2xl font-bold text-white">Spin Class</h1>
+              <p className="text-gray-400 text-sm">{segments.length} tracks • {minutes} min</p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={() => {
                   setElapsed(0);
@@ -135,7 +144,7 @@ function WorkoutContent() {
                 Reset
               </button>
               <button
-                disabled={!playerReady}
+                disabled={!canStart}
                 onClick={() => {
                   const starting = !isPlaying;
                   setIsPlaying((p) => !p);
@@ -144,13 +153,13 @@ function WorkoutContent() {
                     lastPlayedIndex.current = null;
                   }
                 }}
-                className={`px-6 py-2 rounded-full font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                className={`px-5 py-2 rounded-full font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
                   isPlaying
                     ? 'bg-gray-700 hover:bg-gray-600 text-white'
                     : 'bg-green-500 hover:bg-green-400 text-black'
                 }`}
               >
-                {isPlaying ? '⏸ Pause' : '▶ Start Workout'}
+                {isPlaying ? '⏸ Pause' : '▶ Start'}
               </button>
             </div>
           </div>
@@ -169,14 +178,21 @@ function WorkoutContent() {
             </div>
           </div>
 
-          {/* SDK status / playback error */}
-          {(playerStatus || playbackError) && (
-            <div className={`p-3 rounded-xl text-sm mb-4 ${
+          {/* Mobile hint */}
+          {isMobile && !isPlaying && !playbackError && (
+            <div className="mb-3 p-3 bg-blue-900/30 border border-blue-700 rounded-xl text-blue-300 text-xs">
+              Open the Spotify app on your phone before pressing Start — music will play there while you follow the workout here.
+            </div>
+          )}
+
+          {/* SDK status / errors */}
+          {(statusMsg || playbackError) && (
+            <div className={`p-3 rounded-xl text-sm mb-3 ${
               sdkError || playbackError
                 ? 'bg-red-900/30 border border-red-700 text-red-300'
                 : 'bg-gray-800 border border-gray-700 text-gray-400'
             }`}>
-              {playbackError ?? playerStatus}
+              {playbackError ?? statusMsg}
               {(sdkError ?? '').includes('Premium') && (
                 <span className="block mt-1 text-xs text-red-400">
                   Spotify Premium is required for in-browser playback.
@@ -188,38 +204,39 @@ function WorkoutContent() {
           {/* Now playing */}
           {currentSegment && isPlaying ? (
             <div className="p-3 bg-green-900/30 border border-green-700 rounded-xl">
-              <p className="text-green-300 text-sm font-medium">
-                NOW: {currentSegment.track.name} — {currentSegment.instruction}
+              <p className="text-green-300 text-sm font-medium leading-snug">
+                NOW: {currentSegment.track.name}
               </p>
+              <p className="text-green-400/70 text-xs mt-0.5">{currentSegment.instruction}</p>
             </div>
           ) : (
             <div className="p-3 bg-gray-800 rounded-xl">
               <p className="text-gray-500 text-sm">
-                {playerReady ? 'Press Start Workout to begin' : 'Waiting for Spotify…'}
+                {canStart ? 'Press Start to begin' : 'Waiting for Spotify…'}
               </p>
             </div>
           )}
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatsCard icon="⏱" label="Total Duration" value={`${minutes} min`} />
-          <StatsCard icon="🎵" label="Avg BPM" value={stats.avgBPM} sublabel="beats per minute" />
-          <StatsCard icon="⚡" label="Avg Energy" value={`${stats.avgEnergy}%`} sublabel="Spotify energy score" />
-          <StatsCard icon="🔥" label="Est. Calories" value={stats.totalCaloriesEstimate} sublabel="rough estimate" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+          <StatsCard icon="⏱" label="Duration" value={`${minutes} min`} />
+          <StatsCard icon="🎵" label="Avg BPM" value={stats.avgBPM} sublabel="beats/min" />
+          <StatsCard icon="⚡" label="Energy" value={`${stats.avgEnergy}%`} sublabel="Spotify score" />
+          <StatsCard icon="🔥" label="Calories" value={stats.totalCaloriesEstimate} sublabel="estimate" />
         </div>
 
         {/* Timeline */}
-        <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Workout Timeline</h2>
+        <div className="bg-gray-900 border border-gray-700 rounded-2xl p-4 sm:p-6">
+          <h2 className="text-base sm:text-lg font-semibold text-white mb-4">Workout Timeline</h2>
           <WorkoutTimeline spinClass={spinClass} />
         </div>
 
         {/* Track list */}
         <div>
-          <h2 className="text-lg font-semibold text-white mb-4">
+          <h2 className="text-base sm:text-lg font-semibold text-white mb-3 sm:mb-4">
             Track Breakdown
-            <span className="text-gray-500 font-normal text-sm ml-2">({segments.length} segments)</span>
+            <span className="text-gray-500 font-normal text-sm ml-2">({segments.length})</span>
           </h2>
           <div className="space-y-3">
             {segments.map((segment, i) => (

@@ -2,6 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+function isMobileBrowser() {
+  if (typeof navigator === 'undefined') return false;
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+    navigator.userAgent
+  );
+}
+
 function loadSdk(): Promise<void> {
   if (typeof window === 'undefined') return Promise.resolve();
   if (window.Spotify) return Promise.resolve();
@@ -17,9 +24,18 @@ export function useSpotifyPlayer() {
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
   const playerRef = useRef<Spotify.Player | null>(null);
 
   useEffect(() => {
+    // Mobile browsers don't support the Web Playback SDK.
+    // Mark as ready immediately so the workout page can use Connect mode.
+    if (isMobileBrowser()) {
+      setIsMobile(true);
+      setIsReady(true);
+      return;
+    }
+
     let cancelled = false;
 
     async function init() {
@@ -28,7 +44,6 @@ export function useSpotifyPlayer() {
 
       const player = new window.Spotify.Player({
         name: 'Spin Class',
-        // Called by the SDK whenever it needs a fresh token
         getOAuthToken: (cb) => {
           fetch('/api/spotify/token')
             .then((r) => r.json())
@@ -44,7 +59,9 @@ export function useSpotifyPlayer() {
       player.addListener('not_ready', () => setIsReady(false));
       player.addListener('initialization_error', ({ message }) => setError(message));
       player.addListener('authentication_error', ({ message }) => setError(message));
-      player.addListener('account_error', ({ message }) => setError('Spotify Premium required for in-browser playback'));
+      player.addListener('account_error', () =>
+        setError('Spotify Premium required for in-browser playback')
+      );
 
       const connected = await player.connect();
       if (!connected && !cancelled) setError('Failed to connect Spotify player');
@@ -59,5 +76,5 @@ export function useSpotifyPlayer() {
     };
   }, []);
 
-  return { deviceId, isReady, error };
+  return { deviceId, isReady, error, isMobile };
 }
