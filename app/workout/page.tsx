@@ -51,6 +51,21 @@ function WorkoutContent() {
     }
   };
 
+  const pausePlayback = async () => {
+    try {
+      const body: Record<string, string> = {};
+      if (deviceId) body.deviceId = deviceId;
+      else if (isMobile && mobileDeviceId.current) body.deviceId = mobileDeviceId.current;
+      await fetch('/api/spotify/player', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    } catch {
+      // best-effort — don't surface pause errors
+    }
+  };
+
   const playTrack = async (trackUri: string) => {
     setPlaybackError(null);
     try {
@@ -176,9 +191,16 @@ function WorkoutContent() {
                 onClick={() => {
                   const starting = !isPlaying;
                   setIsPlaying((p) => !p);
-                  if (starting && activeIndex === null) {
-                    setActiveIndex(0);
-                    lastPlayedIndex.current = null;
+                  if (starting) {
+                    if (activeIndex === null) {
+                      setActiveIndex(0);
+                      lastPlayedIndex.current = null;
+                    } else {
+                      // Resume — replay the current track
+                      playTrack(`spotify:track:${segments[activeIndex].track.id}`);
+                    }
+                  } else {
+                    pausePlayback();
                   }
                 }}
                 className={`px-5 py-2 rounded-full font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed ${

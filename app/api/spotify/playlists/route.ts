@@ -21,6 +21,10 @@ export async function GET(req: NextRequest) {
 
   try {
     const data = await getUserPlaylists(token, limit, offset);
+    // Temporary: log what Spotify returns for the first playlist's tracks field
+    if (data?.items?.[0]) {
+      console.log('[playlists] first item tracks field:', JSON.stringify(data.items[0].tracks));
+    }
     return NextResponse.json(data);
   } catch (err) {
     console.error('Playlists error:', err);
