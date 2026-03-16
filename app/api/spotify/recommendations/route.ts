@@ -13,11 +13,12 @@ export async function GET(req: NextRequest) {
   try {
     const g = genre.split(',')[0];
     // Spotify rejects explicit `limit` for new apps, so we paginate via offset.
-    // 3 pages × 20 (default) = up to 60 tracks — enough for any workout length.
+    // Use a random base offset so each generation pulls different tracks.
+    const baseOffset = Math.floor(Math.random() * 100);
     const pages = await Promise.allSettled([
-      searchTracksByGenre(token, g, 0),
-      searchTracksByGenre(token, g, 20),
-      searchTracksByGenre(token, g, 40),
+      searchTracksByGenre(token, g, baseOffset),
+      searchTracksByGenre(token, g, baseOffset + 20),
+      searchTracksByGenre(token, g, baseOffset + 40),
     ]);
 
     const seen = new Set<string>();

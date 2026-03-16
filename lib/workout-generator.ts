@@ -106,13 +106,20 @@ export function generateSpinClass(
   playlistName: string,
   targetDuration?: number // seconds; if provided, selects tracks to fill ±2 min
 ): SpinClass {
+  // Shuffle tracks for variety on each generation
+  const shuffled = [...tracks];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+
   // Select tracks to match the target duration (greedy: add until within window)
-  let selected = tracks;
-  if (targetDuration != null && tracks.length > 0) {
+  let selected = shuffled;
+  if (targetDuration != null && shuffled.length > 0) {
     const minTarget = targetDuration - 120; // −2 min
     selected = [];
     let accumulated = 0;
-    for (const t of tracks) {
+    for (const t of shuffled) {
       selected.push(t);
       accumulated += Math.round(t.track.duration_ms / 1000);
       if (accumulated >= minTarget) break;
