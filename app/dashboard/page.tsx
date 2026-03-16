@@ -258,12 +258,12 @@ export default function DashboardPage() {
           {/* Workout length selector */}
           <div className="mb-5">
             <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Workout length</p>
-            <div className="flex gap-2">
+            <div className="grid grid-cols-4 gap-2">
               {LENGTH_OPTIONS.map((min) => (
                 <button
                   key={min}
                   onClick={() => setWorkoutLength(min)}
-                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors border ${
+                  className={`py-2 rounded-lg text-sm font-medium transition-colors border ${
                     workoutLength === min
                       ? 'bg-green-600 text-white border-green-500'
                       : 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700 hover:text-white'
