@@ -150,6 +150,7 @@ export async function searchTracksByGenre(token: string, genre: string) {
     q: `${keyword} music`,
     type: 'track',
     market: 'from_token',
+    limit: '50',
   });
   return spotifyFetch(`/search?${params}`, token);
 }

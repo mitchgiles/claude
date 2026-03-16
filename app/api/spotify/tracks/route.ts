@@ -25,8 +25,22 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'playlistId required' }, { status: 400 });
   }
 
+  // How many tracks to fetch — caller passes needed count, we paginate up to 200.
+  const needed = Math.min(parseInt(searchParams.get('needed') ?? '50', 10) || 50, 200);
+
   try {
-    const data = await getPlaylistTracks(token, playlistId, 50, 0);
+    // Fetch up to `needed` tracks across multiple pages (Spotify max 50/page).
+    const allItems: unknown[] = [];
+    let offset = 0;
+    while (allItems.length < needed) {
+      const pageLimit = Math.min(50, needed - allItems.length);
+      const page = await getPlaylistTracks(token, playlistId, pageLimit, offset);
+      const items: unknown[] = page.items ?? [];
+      allItems.push(...items);
+      if (!page.next || items.length === 0) break;
+      offset += items.length;
+    }
+    const data = { items: allItems };
     return NextResponse.json(data);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

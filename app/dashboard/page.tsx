@@ -103,8 +103,9 @@ export default function DashboardPage() {
     setError(null);
 
     try {
-      // 1. Fetch tracks
-      const tracksRes = await fetch(`/api/spotify/tracks?playlistId=${playlist.id}`, {
+      // 1. Fetch tracks — request enough for the target duration (3 min/track avg, 1.5× buffer)
+      const neededTracks = Math.min(Math.ceil((workoutLength * 60) / 180 * 1.5), 200);
+      const tracksRes = await fetch(`/api/spotify/tracks?playlistId=${playlist.id}&needed=${neededTracks}`, {
         credentials: 'include',
         cache: 'no-store',
       });
@@ -121,7 +122,7 @@ export default function DashboardPage() {
       // /items endpoint returns { item: track } (not { track: track })
       const tracks: SpotifyTrack[] = tracksData.items
         .map((item: { item?: SpotifyTrack; track?: SpotifyTrack }) => item.item ?? item.track)
-        .filter((t: SpotifyTrack | null) => t && t.id && (t as { type?: string }).type !== 'episode');
+        .filter((t: SpotifyTrack | null) => t && t.id && t.duration_ms > 0 && (t as { type?: string }).type !== 'episode');
 
       if (tracks.length === 0) throw new Error('No tracks found in this playlist');
 
@@ -194,7 +195,7 @@ export default function DashboardPage() {
       }
       const recData = await recRes.json();
       const tracks: SpotifyTrack[] = (recData.tracks as SpotifyTrack[]).filter(
-        (t) => t && t.id
+        (t) => t && t.id && t.duration_ms > 0
       );
       if (tracks.length === 0) throw new Error('No tracks found for this genre');
 
