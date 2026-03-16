@@ -33,6 +33,34 @@ export default function DashboardPage() {
   const [genreError, setGenreError] = useState<string | null>(null);
   const LIMIT = 20;
 
+  // After the list loads, backfill track counts individually since /me/playlists
+  // no longer returns tracks.total in simplified playlist objects.
+  const backfillTrackCounts = useCallback(async (items: SpotifyPlaylist[]) => {
+    const missing = items.filter((p) => !p.tracks?.total);
+    if (missing.length === 0) return;
+    await Promise.allSettled(
+      missing.map(async (playlist) => {
+        try {
+          const res = await fetch(`/api/spotify/playlist?id=${playlist.id}`, {
+            credentials: 'include',
+            cache: 'no-store',
+          });
+          if (!res.ok) return;
+          const detail = await res.json();
+          const total: number | undefined = detail?.tracks?.total;
+          if (total == null) return;
+          setPlaylists((prev) =>
+            prev.map((p) =>
+              p.id === playlist.id ? { ...p, tracks: { total } } : p
+            )
+          );
+        } catch {
+          // best-effort
+        }
+      })
+    );
+  }, []);
+
   const fetchPlaylists = useCallback(async (newOffset: number) => {
     setIsLoadingPlaylists(true);
     try {
@@ -46,19 +74,21 @@ export default function DashboardPage() {
         return;
       }
       const data = await res.json();
+      const items: SpotifyPlaylist[] = data.items || [];
       if (newOffset === 0) {
-        setPlaylists(data.items || []);
+        setPlaylists(items);
       } else {
-        setPlaylists((prev) => [...prev, ...(data.items || [])]);
+        setPlaylists((prev) => [...prev, ...items]);
       }
       setHasMore(!!data.next);
       setOffset(newOffset + LIMIT);
+      backfillTrackCounts(items);
     } catch {
       setError('Failed to load playlists. Please try again.');
     } finally {
       setIsLoadingPlaylists(false);
     }
-  }, []);
+  }, [backfillTrackCounts]);
 
   useEffect(() => {
     fetchPlaylists(0);
