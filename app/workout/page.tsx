@@ -35,17 +35,23 @@ function WorkoutContent() {
     if (!id || !spinClass) router.push('/dashboard');
   }, [id, router, spinClass]);
 
-  // Fetch available Spotify Connect devices and return the first device id.
+  // Fetch available Spotify Connect devices and return the best device id.
+  // On mobile we want the phone's Spotify app (type "Smartphone"), not a desktop.
   const resolveConnectDevice = async (): Promise<string | null> => {
     try {
       const res = await fetch('/api/spotify/devices');
       if (!res.ok) return null;
       const data = await res.json();
-      const devices: Array<{ id: string; name: string; is_active: boolean }> =
+      const devices: Array<{ id: string; name: string; type: string; is_active: boolean }> =
         data.devices ?? [];
       if (devices.length === 0) return null;
-      // Prefer the active device; fall back to the first available one.
-      return (devices.find((d) => d.is_active) ?? devices[0]).id;
+      // Priority: active smartphone > any smartphone > active device > first device
+      return (
+        devices.find((d) => d.is_active && d.type === 'Smartphone') ??
+        devices.find((d) => d.type === 'Smartphone') ??
+        devices.find((d) => d.is_active) ??
+        devices[0]
+      ).id;
     } catch {
       return null;
     }

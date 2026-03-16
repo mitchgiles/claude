@@ -98,11 +98,7 @@ async function spotifyFetch(endpoint: string, token: string) {
 }
 
 export async function getUserPlaylists(token: string, limit = 20, offset = 0) {
-  const fields = 'items(id,name,description,images,tracks(total),owner(display_name)),next,total,offset';
-  return spotifyFetch(
-    `/me/playlists?limit=${limit}&offset=${offset}&fields=${encodeURIComponent(fields)}`,
-    token
-  );
+  return spotifyFetch(`/me/playlists?limit=${limit}&offset=${offset}`, token);
 }
 
 export async function getPlaylistTracks(
