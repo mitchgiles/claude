@@ -1,0 +1,11 @@
+[build]
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 120
+restartPolicyType = "on_failure"
+
+[environments.production.variables]
+# Set ANTHROPIC_API_KEY in the Railway dashboard → Variables tab
+# Optionally restrict CORS:  ALLOWED_ORIGINS=https://your-vercel-app.vercel.app

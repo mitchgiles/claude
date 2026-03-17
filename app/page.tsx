@@ -74,6 +74,27 @@ export default function HomePage({ searchParams }: { searchParams: Promise<{ err
       </main>
 
       {/* Footer */}
+      {/* GF Finder promo */}
+      <section className="px-4 pb-12 flex justify-center">
+        <Link
+          href="/gf-finder"
+          className="flex items-center gap-4 bg-gray-900 border border-gray-800 hover:border-green-800 rounded-2xl px-6 py-4 transition-colors max-w-sm w-full group"
+        >
+          <div className="w-10 h-10 rounded-xl bg-green-700 flex items-center justify-center shrink-0 text-xl">
+            🌾
+          </div>
+          <div>
+            <p className="text-white font-semibold text-sm group-hover:text-green-400 transition-colors">
+              GF Price Finder
+            </p>
+            <p className="text-gray-500 text-xs">
+              Scan your receipt · find the cheapest gluten-free options in Canada
+            </p>
+          </div>
+          <span className="text-gray-600 group-hover:text-green-500 transition-colors ml-auto">→</span>
+        </Link>
+      </section>
+
       <footer className="py-6 text-center text-gray-600 text-sm border-t border-gray-900">
         SpinSync is not affiliated with Spotify. Uses the Spotify Web API.
       </footer>
