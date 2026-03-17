@@ -1,0 +1,12 @@
+[build]
+dockerfilePath = "gf-price-finder/Dockerfile"
+
+[deploy]
+startCommand = "uvicorn api:app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "on_failure"
+
+[environments.production.variables]
+# Set ANTHROPIC_API_KEY in the Railway dashboard → Variables tab
+# Optionally restrict CORS:  ALLOWED_ORIGINS=https://your-vercel-app.vercel.app
