@@ -49,8 +49,6 @@ function triggerDownload(b64: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-const API_URL = process.env.NEXT_PUBLIC_GF_API_URL ?? 'http://localhost:8000';
-
 const STEP_LABELS: Record<number, string> = {
   1: 'Reading receipt',
   2: 'Searching Canadian prices',
@@ -114,7 +112,7 @@ export default function GFFinderPage() {
 
     let response: Response;
     try {
-      response = await fetch(`${API_URL}/analyze`, { method: 'POST', body: form });
+      response = await fetch('/api/gf-analyze', { method: 'POST', body: form });
     } catch {
       setErrorMsg('Could not reach the analysis server. Is it running?');
       setPhase('error');
