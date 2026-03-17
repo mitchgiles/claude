@@ -1,5 +1,5 @@
 [build]
-dockerfilePath = "gf-price-finder/Dockerfile"
+dockerfilePath = "Dockerfile"
 
 [deploy]
 healthcheckPath = "/health"
