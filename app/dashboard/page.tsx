@@ -32,6 +32,7 @@ export default function DashboardPage() {
   const [hasMore, setHasMore] = useState(false);
   const [genreError, setGenreError] = useState<string | null>(null);
   const [workoutLength, setWorkoutLength] = useState(45);
+  const [aiMode, setAiMode] = useState(false);
   const LIMIT = 20;
   const LENGTH_OPTIONS = [20, 30, 45, 60];
 
@@ -158,14 +159,54 @@ export default function DashboardPage() {
         features: { id: track.id, tempo: 128, energy: 0.7, valence: 0.5, danceability: 0.6 } as AudioFeatures,
       }));
 
-      // 4. Generate spin class
-      const generated = generateSpinClass(inputTracks, playlist.name, workoutLength * 60);
+      // 4. Generate spin class (AI or rule-based)
+      let generated;
+      if (aiMode) {
+        generated = await handleAIGenerateWorkout(tracks, featuresMap, playlist.name);
+      } else {
+        generated = generateSpinClass(inputTracks, playlist.name, workoutLength * 60);
+      }
       setSpinClass(generated);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
       setIsGenerating(false);
     }
+  }
+
+  async function handleAIGenerateWorkout(
+    tracks: SpotifyTrack[],
+    featuresMap: Map<string, AudioFeatures>,
+    playlistName: string,
+  ) {
+    const tracksWithFeatures = tracks
+      .map((track) => ({ track, features: featuresMap.get(track.id) }))
+      .filter((t): t is { track: SpotifyTrack; features: AudioFeatures } => !!t.features);
+
+    const inputTracks = tracksWithFeatures.length > 0
+      ? tracksWithFeatures
+      : tracks.map((track) => ({
+          track,
+          features: { id: track.id, tempo: 128, energy: 0.7, valence: 0.5, danceability: 0.6 } as AudioFeatures,
+        }));
+
+    const res = await fetch('/api/ai/generate-workout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        tracks: inputTracks,
+        playlistName,
+        targetDuration: workoutLength * 60,
+      }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || `AI generation failed (${res.status})`);
+    }
+
+    const data = await res.json();
+    return data.spinClass;
   }
 
   async function handleGenreWorkout(genre: string) {
@@ -225,7 +266,12 @@ export default function DashboardPage() {
         } as AudioFeatures,
       }));
 
-      const generated = generateSpinClass(tracksWithFeatures, syntheticPlaylist.name, workoutLength * 60);
+      let generated;
+      if (aiMode) {
+        generated = await handleAIGenerateWorkout(tracks, featuresMap, syntheticPlaylist.name);
+      } else {
+        generated = generateSpinClass(tracksWithFeatures, syntheticPlaylist.name, workoutLength * 60);
+      }
       setSpinClass(generated);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');
@@ -273,6 +319,39 @@ export default function DashboardPage() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* AI mode toggle */}
+          <div className="mb-5">
+            <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Generation mode</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setAiMode(false)}
+                className={`py-2 rounded-lg text-sm font-medium transition-colors border ${
+                  !aiMode
+                    ? 'bg-green-600 text-white border-green-500'
+                    : 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700 hover:text-white'
+                }`}
+              >
+                Rule-based
+              </button>
+              <button
+                onClick={() => setAiMode(true)}
+                className={`py-2 rounded-lg text-sm font-medium transition-colors border flex items-center justify-center gap-1.5 ${
+                  aiMode
+                    ? 'bg-purple-600 text-white border-purple-500'
+                    : 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700 hover:text-white'
+                }`}
+              >
+                <span>AI Coach</span>
+                <span className="text-xs opacity-70">✦</span>
+              </button>
+            </div>
+            {aiMode && (
+              <p className="mt-1.5 text-xs text-purple-400">
+                Claude analyzes your tracks and crafts a personalized workout arc.
+              </p>
+            )}
           </div>
 
           {/* Genre-based random playlist */}
@@ -344,10 +423,14 @@ export default function DashboardPage() {
 
           {isGenerating && (
             <div className="flex flex-col items-center justify-center h-64 text-center">
-              <div className="w-12 h-12 border-4 border-green-500 border-t-transparent rounded-full animate-spin mb-4" />
-              <p className="text-white font-semibold">Analyzing your music...</p>
+              <div className={`w-12 h-12 border-4 border-t-transparent rounded-full animate-spin mb-4 ${aiMode ? 'border-purple-500' : 'border-green-500'}`} />
+              <p className="text-white font-semibold">
+                {aiMode ? 'AI is crafting your workout...' : 'Analyzing your music...'}
+              </p>
               <p className="text-gray-400 text-sm mt-1">
-                Fetching audio features for &ldquo;{selectedPlaylist?.name}&rdquo;
+                {aiMode
+                  ? 'Claude is planning the perfect arc for \u201c' + selectedPlaylist?.name + '\u201d'
+                  : 'Fetching audio features for \u201c' + selectedPlaylist?.name + '\u201d'}
               </p>
             </div>
           )}
@@ -373,7 +456,7 @@ export default function DashboardPage() {
               }}
               className="block"
             >
-              <SpinClassPreview spinClass={spinClass} />
+              <SpinClassPreview spinClass={spinClass} isAI={spinClass.id.startsWith('spin-ai-')} />
             </Link>
           )}
         </main>
@@ -382,7 +465,7 @@ export default function DashboardPage() {
   );
 }
 
-function SpinClassPreview({ spinClass }: { spinClass: SpinClass }) {
+function SpinClassPreview({ spinClass, isAI = false }: { spinClass: SpinClass; isAI?: boolean }) {
   const { stats, segments, totalDuration, playlistName } = spinClass;
   const minutes = Math.floor(totalDuration / 60);
 
@@ -393,10 +476,12 @@ function SpinClassPreview({ spinClass }: { spinClass: SpinClass }) {
   }, {});
 
   return (
-    <div className="bg-gray-900 border border-green-600 rounded-2xl p-6 hover:border-green-400 transition-colors cursor-pointer group">
+    <div className={`bg-gray-900 rounded-2xl p-6 transition-colors cursor-pointer group ${isAI ? 'border border-purple-600 hover:border-purple-400' : 'border border-green-600 hover:border-green-400'}`}>
       <div className="flex items-start justify-between mb-6">
         <div>
-          <p className="text-green-400 text-sm font-medium mb-1">Workout Generated!</p>
+          <p className={`text-sm font-medium mb-1 ${isAI ? 'text-purple-400' : 'text-green-400'}`}>
+            {isAI ? '✦ AI Workout Generated!' : 'Workout Generated!'}
+          </p>
           <h2 className="text-2xl font-bold text-white">{playlistName}</h2>
           <p className="text-gray-400 mt-1">{segments.length} tracks • {minutes} minutes</p>
         </div>
