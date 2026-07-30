@@ -103,7 +103,11 @@ export function deleteOrder(orderId: string): Order[] {
 }
 
 function csvEscape(value: string | number): string {
-  const str = String(value);
+  let str = String(value);
+  // Prevent formula injection when opened in Excel/Sheets (e.g. "=cmd(...)").
+  if (/^[=+\-@]/.test(str)) {
+    str = `'${str}`;
+  }
   if (/[",\n]/.test(str)) {
     return `"${str.replace(/"/g, '""')}"`;
   }
