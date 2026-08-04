@@ -18,6 +18,15 @@ export interface OrderLine {
 
 export type PaymentMethod = 'Card' | 'Cash' | 'Invoice me';
 
+export interface Address {
+  line1: string;
+  line2: string;
+  city: string;
+  postcode: string;
+}
+
+export const EMPTY_ADDRESS: Address = { line1: '', line2: '', city: '', postcode: '' };
+
 export interface Order {
   id: string;
   createdAt: string;
@@ -29,6 +38,10 @@ export interface Order {
   paymentMethod: PaymentMethod;
   lines: OrderLine[];
   total: number;
+  shippingAddress: Address;
+  billingSameAsShipping: boolean;
+  billingAddress: Address;
+  stripeCheckoutUrl: string;
 }
 
 // Placeholder catalog — replace names/SKUs/prices with the real Scourr trade show lineup.
@@ -123,6 +136,15 @@ export function ordersToCsv(orders: Order[]): string {
     'Email',
     'Phone',
     'Payment Method',
+    'Shipping Address Line 1',
+    'Shipping Address Line 2',
+    'Shipping City',
+    'Shipping Postcode',
+    'Billing Address Line 1',
+    'Billing Address Line 2',
+    'Billing City',
+    'Billing Postcode',
+    'Stripe Checkout URL',
     'Product SKU',
     'Product Name',
     'Quantity',
@@ -134,6 +156,7 @@ export function ordersToCsv(orders: Order[]): string {
 
   const rows: string[][] = [];
   for (const order of orders) {
+    const billing = order.billingSameAsShipping ? order.shippingAddress : order.billingAddress;
     for (const line of order.lines) {
       rows.push([
         order.id,
@@ -143,6 +166,15 @@ export function ordersToCsv(orders: Order[]): string {
         order.email,
         order.phone,
         order.paymentMethod,
+        order.shippingAddress.line1,
+        order.shippingAddress.line2,
+        order.shippingAddress.city,
+        order.shippingAddress.postcode,
+        billing.line1,
+        billing.line2,
+        billing.city,
+        billing.postcode,
+        order.stripeCheckoutUrl,
         line.sku,
         line.name,
         String(line.quantity),

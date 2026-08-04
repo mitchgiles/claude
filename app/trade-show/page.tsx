@@ -1,14 +1,16 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Minus, Plus, Trash2, Download, ShoppingCart, CheckCircle2 } from 'lucide-react';
+import { Minus, Plus, Trash2, Download, ShoppingCart, CheckCircle2, CreditCard, ExternalLink } from 'lucide-react';
 import {
   CATALOG,
+  EMPTY_ADDRESS,
   formatCurrency,
   getOrders,
   saveOrder,
   deleteOrder,
   downloadCsv,
+  type Address,
   type Order,
   type OrderLine,
   type PaymentMethod,
@@ -25,11 +27,17 @@ export default function TradeShowPage() {
   const [phone, setPhone] = useState('');
   const [notes, setNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Card');
+  const [shippingAddress, setShippingAddress] = useState<Address>(EMPTY_ADDRESS);
+  const [billingSameAsShipping, setBillingSameAsShipping] = useState(true);
+  const [billingAddress, setBillingAddress] = useState<Address>(EMPTY_ADDRESS);
+  const [orderRef, setOrderRef] = useState<string | null>(null);
+  const [stripeCheckoutUrl, setStripeCheckoutUrl] = useState<string | null>(null);
+  const [stripeLoading, setStripeLoading] = useState(false);
+  const [stripeError, setStripeError] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<string | null>(null);
 
   useEffect(() => {
     // One-time hydration from localStorage; SSR has no access to it.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setOrders(getOrders());
   }, []);
 
@@ -66,13 +74,47 @@ export default function TradeShowPage() {
     setPhone('');
     setNotes('');
     setPaymentMethod('Card');
+    setShippingAddress(EMPTY_ADDRESS);
+    setBillingSameAsShipping(true);
+    setBillingAddress(EMPTY_ADDRESS);
+    setOrderRef(null);
+    setStripeCheckoutUrl(null);
+    setStripeError(null);
+  }
+
+  async function generateStripeLink() {
+    if (cartLines.length === 0) return;
+    setStripeLoading(true);
+    setStripeError(null);
+    const ref = orderRef ?? crypto.randomUUID().slice(0, 8);
+    if (!orderRef) setOrderRef(ref);
+
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId: ref,
+          customerEmail: email.trim() || undefined,
+          lines: cartLines.map((l) => ({ name: l.name, unitPrice: l.unitPrice, quantity: l.quantity })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to create Stripe checkout link.');
+      setStripeCheckoutUrl(data.url);
+      window.open(data.url, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      setStripeError(err instanceof Error ? err.message : 'Failed to create Stripe checkout link.');
+    } finally {
+      setStripeLoading(false);
+    }
   }
 
   function completeOrder() {
     if (cartLines.length === 0) return;
 
     const order: Order = {
-      id: crypto.randomUUID().slice(0, 8),
+      id: orderRef ?? crypto.randomUUID().slice(0, 8),
       createdAt: new Date().toLocaleString('en-GB'),
       customerName: customerName.trim() || 'Walk-in',
       company: company.trim(),
@@ -82,6 +124,10 @@ export default function TradeShowPage() {
       paymentMethod,
       lines: cartLines,
       total: cartTotal,
+      shippingAddress,
+      billingSameAsShipping,
+      billingAddress: billingSameAsShipping ? EMPTY_ADDRESS : billingAddress,
+      stripeCheckoutUrl: stripeCheckoutUrl ?? '',
     };
 
     const updated = saveOrder(order);
@@ -251,6 +297,50 @@ export default function TradeShowPage() {
                   </option>
                 ))}
               </select>
+
+              {paymentMethod === 'Card' && (
+                <div className="rounded-lg bg-slate-50 p-3">
+                  <button
+                    type="button"
+                    onClick={generateStripeLink}
+                    disabled={cartLines.length === 0 || stripeLoading}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white py-2.5 text-sm font-semibold hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-300"
+                  >
+                    <CreditCard size={16} />
+                    {stripeLoading ? 'Creating Stripe checkout…' : 'Get Stripe payment link'}
+                  </button>
+                  {stripeCheckoutUrl && (
+                    <a
+                      href={stripeCheckoutUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 flex items-center justify-center gap-1 text-sm font-medium text-emerald-700 hover:underline"
+                    >
+                      Open Stripe checkout <ExternalLink size={14} />
+                    </a>
+                  )}
+                  {stripeError && <p className="mt-2 text-sm text-red-600">{stripeError}</p>}
+                </div>
+              )}
+
+              <p className="pt-2 text-sm font-semibold text-slate-600">Shipping address</p>
+              <AddressFields value={shippingAddress} onChange={setShippingAddress} idPrefix="ship" />
+
+              <label className="flex items-center gap-2 pt-2 text-sm text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={billingSameAsShipping}
+                  onChange={(e) => setBillingSameAsShipping(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300"
+                />
+                Billing address same as shipping
+              </label>
+              {!billingSameAsShipping && (
+                <>
+                  <p className="pt-1 text-sm font-semibold text-slate-600">Billing address</p>
+                  <AddressFields value={billingAddress} onChange={setBillingAddress} idPrefix="bill" />
+                </>
+              )}
             </div>
 
             <div className="mt-4 flex gap-2">
@@ -349,6 +439,55 @@ export default function TradeShowPage() {
           )}
         </section>
       </main>
+    </div>
+  );
+}
+
+function AddressFields({
+  value,
+  onChange,
+  idPrefix,
+}: {
+  value: Address;
+  onChange: (next: Address) => void;
+  idPrefix: string;
+}) {
+  function set(field: keyof Address, fieldValue: string) {
+    onChange({ ...value, [field]: fieldValue });
+  }
+
+  return (
+    <div className="space-y-2">
+      <input
+        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+        placeholder="Address line 1"
+        value={value.line1}
+        onChange={(e) => set('line1', e.target.value)}
+        id={`${idPrefix}-line1`}
+      />
+      <input
+        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+        placeholder="Address line 2 (optional)"
+        value={value.line2}
+        onChange={(e) => set('line2', e.target.value)}
+        id={`${idPrefix}-line2`}
+      />
+      <div className="flex gap-2">
+        <input
+          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+          placeholder="City/Town"
+          value={value.city}
+          onChange={(e) => set('city', e.target.value)}
+          id={`${idPrefix}-city`}
+        />
+        <input
+          className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+          placeholder="Postcode"
+          value={value.postcode}
+          onChange={(e) => set('postcode', e.target.value)}
+          id={`${idPrefix}-postcode`}
+        />
+      </div>
     </div>
   );
 }
