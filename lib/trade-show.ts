@@ -44,42 +44,20 @@ export interface Order {
   stripeCheckoutUrl: string;
 }
 
-// Placeholder catalog — replace names/SKUs/prices with the real Scourr trade show lineup.
 export const CATALOG: Product[] = [
   {
     id: 'single',
     sku: 'SCR-001',
     name: 'Scourr Original Cloth — Single',
     description: 'One reusable cleaning cloth',
-    price: 4.99,
+    price: 1.25,
   },
   {
     id: 'pack3',
     sku: 'SCR-003',
     name: 'Scourr Original Cloth — 3 Pack',
     description: 'Three cloths, mixed colours',
-    price: 12.99,
-  },
-  {
-    id: 'pack6',
-    sku: 'SCR-006',
-    name: 'Scourr Original Cloth — 6 Pack',
-    description: 'Six cloths, mixed colours',
-    price: 22.99,
-  },
-  {
-    id: 'bundle',
-    sku: 'SCR-BUNDLE',
-    name: 'Scourr Kitchen Bundle',
-    description: '6 cloths + storage caddy',
-    price: 29.99,
-  },
-  {
-    id: 'pack12',
-    sku: 'SCR-012',
-    name: 'Scourr Trade Show Special — 12 Pack',
-    description: 'Show-only bulk pack',
-    price: 39.99,
+    price: 3.75,
   },
 ];
 
