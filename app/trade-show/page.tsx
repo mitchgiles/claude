@@ -39,6 +39,8 @@ export default function TradeShowPage() {
   const [stripeLoading, setStripeLoading] = useState(false);
   const [stripeError, setStripeError] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<string | null>(null);
+  const [emailStatus, setEmailStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [emailError, setEmailError] = useState<string | null>(null);
 
   useEffect(() => {
     // One-time hydration from localStorage; SSR has no access to it.
@@ -118,6 +120,24 @@ export default function TradeShowPage() {
     }
   }
 
+  async function sendOrderEmails(order: Order) {
+    setEmailStatus('sending');
+    setEmailError(null);
+    try {
+      const res = await fetch('/api/email/order-confirmation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to send confirmation emails.');
+      setEmailStatus('sent');
+    } catch (err) {
+      setEmailStatus('error');
+      setEmailError(err instanceof Error ? err.message : 'Failed to send confirmation emails.');
+    }
+  }
+
   function completeOrder() {
     if (cartLines.length === 0) return;
 
@@ -144,6 +164,7 @@ export default function TradeShowPage() {
     setOrders(updated);
     setConfirmation(`Order #${order.id} saved — ${formatCurrency(order.total)}`);
     clearCart();
+    void sendOrderEmails(order);
     setTimeout(() => setConfirmation(null), 4000);
   }
 
@@ -413,6 +434,15 @@ export default function TradeShowPage() {
               <p className="mt-3 flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">
                 <CheckCircle2 size={16} /> {confirmation}
               </p>
+            )}
+            {emailStatus === 'sending' && (
+              <p className="mt-2 text-sm text-slate-500">Sending confirmation emails…</p>
+            )}
+            {emailStatus === 'sent' && (
+              <p className="mt-2 text-sm text-emerald-700">Confirmation emails sent.</p>
+            )}
+            {emailStatus === 'error' && (
+              <p className="mt-2 text-sm text-red-600">Emails not sent: {emailError}</p>
             )}
           </div>
         </section>
