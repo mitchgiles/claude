@@ -39,11 +39,19 @@ export interface Order {
   notes: string;
   paymentMethod: PaymentMethod;
   lines: OrderLine[];
+  subtotal: number;
+  discountPercent: number;
   total: number;
   shippingAddress: Address;
   billingSameAsShipping: boolean;
   billingAddress: Address;
   stripeCheckoutUrl: string;
+}
+
+// Clamps to 0-100 and rounds to the nearest penny.
+export function applyDiscount(subtotal: number, discountPercent: number): number {
+  const clamped = Math.min(100, Math.max(0, discountPercent));
+  return Math.round(subtotal * (1 - clamped / 100) * 100) / 100;
 }
 
 export const CATALOG: Product[] = [
@@ -140,12 +148,14 @@ export function ordersToCsv(orders: Order[]): string {
     'Billing City',
     'Billing Postcode',
     'Stripe Checkout URL',
+    'Subtotal',
+    'Discount %',
+    'Order Total',
     'Product SKU',
     'Product Name',
     'Quantity',
     'Unit Price',
     'Line Total',
-    'Order Total',
     'Notes',
   ];
 
@@ -170,12 +180,14 @@ export function ordersToCsv(orders: Order[]): string {
         billing.city,
         billing.postcode,
         order.stripeCheckoutUrl,
+        order.subtotal.toFixed(2),
+        order.discountPercent.toString(),
+        order.total.toFixed(2),
         line.sku,
         line.name,
         String(line.quantity),
         line.unitPrice.toFixed(2),
         (line.unitPrice * line.quantity).toFixed(2),
-        order.total.toFixed(2),
         order.notes,
       ]);
     }

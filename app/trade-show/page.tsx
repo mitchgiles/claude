@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Minus, Plus, Trash2, Download, ShoppingCart, CheckCircle2, CreditCard, ExternalLink } from 'lucide-react';
 import {
+  applyDiscount,
   CATALOG,
   EMPTY_ADDRESS,
   decrementQty,
@@ -29,6 +30,7 @@ export default function TradeShowPage() {
   const [phone, setPhone] = useState('');
   const [notes, setNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Card');
+  const [discountPercent, setDiscountPercent] = useState(0);
   const [shippingAddress, setShippingAddress] = useState<Address>(EMPTY_ADDRESS);
   const [billingSameAsShipping, setBillingSameAsShipping] = useState(true);
   const [billingAddress, setBillingAddress] = useState<Address>(EMPTY_ADDRESS);
@@ -55,7 +57,9 @@ export default function TradeShowPage() {
     [quantities]
   );
 
-  const cartTotal = cartLines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0);
+  const cartSubtotal = cartLines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0);
+  const cartTotal = applyDiscount(cartSubtotal, discountPercent);
+  const cartDiscountAmount = cartSubtotal - cartTotal;
   const cartItemCount = cartLines.reduce((sum, l) => sum + l.quantity, 0);
 
   const dayStats = useMemo(() => {
@@ -76,6 +80,7 @@ export default function TradeShowPage() {
     setPhone('');
     setNotes('');
     setPaymentMethod('Card');
+    setDiscountPercent(0);
     setShippingAddress(EMPTY_ADDRESS);
     setBillingSameAsShipping(true);
     setBillingAddress(EMPTY_ADDRESS);
@@ -98,6 +103,7 @@ export default function TradeShowPage() {
         body: JSON.stringify({
           orderId: ref,
           customerEmail: email.trim() || undefined,
+          discountPercent,
           lines: cartLines.map((l) => ({ name: l.name, unitPrice: l.unitPrice, quantity: l.quantity })),
         }),
       });
@@ -125,6 +131,8 @@ export default function TradeShowPage() {
       notes: notes.trim(),
       paymentMethod,
       lines: cartLines,
+      subtotal: cartSubtotal,
+      discountPercent,
       total: cartTotal,
       shippingAddress,
       billingSameAsShipping,
@@ -249,9 +257,44 @@ export default function TradeShowPage() {
               </ul>
             )}
 
-            <div className="flex items-center justify-between border-t border-slate-200 pt-3 text-base font-bold">
-              <span>Total ({cartItemCount} items)</span>
-              <span>{formatCurrency(cartTotal)}</span>
+            <div className="border-t border-slate-200 pt-3 text-sm">
+              <div className="flex items-center justify-between text-slate-500">
+                <span>Subtotal ({cartItemCount} items)</span>
+                <span>{formatCurrency(cartSubtotal)}</span>
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <label htmlFor="discount-percent" className="text-slate-500">
+                  Discount
+                </label>
+                <div className="flex items-center gap-1">
+                  <input
+                    id="discount-percent"
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={discountPercent === 0 ? '' : discountPercent}
+                    placeholder="0"
+                    onChange={(e) => {
+                      const parsed = Number(e.target.value);
+                      const clamped = Number.isFinite(parsed) ? Math.min(100, Math.max(0, parsed)) : 0;
+                      setDiscountPercent(clamped);
+                    }}
+                    className="w-16 rounded-lg border border-slate-200 px-2 py-1 text-right text-sm"
+                  />
+                  <span className="text-slate-500">%</span>
+                </div>
+              </div>
+              {discountPercent > 0 && (
+                <div className="mt-1 flex items-center justify-between text-emerald-700">
+                  <span>Discount amount</span>
+                  <span>-{formatCurrency(cartDiscountAmount)}</span>
+                </div>
+              )}
+              <div className="mt-2 flex items-center justify-between text-base font-bold text-slate-900">
+                <span>Total</span>
+                <span>{formatCurrency(cartTotal)}</span>
+              </div>
             </div>
 
             <div className="mt-4 space-y-2">
@@ -425,7 +468,12 @@ export default function TradeShowPage() {
                         {order.lines.map((l) => `${l.quantity}× ${l.name}`).join(', ')}
                       </td>
                       <td className="px-4 py-2">{order.paymentMethod}</td>
-                      <td className="px-4 py-2 text-right font-semibold">{formatCurrency(order.total)}</td>
+                      <td className="px-4 py-2 text-right font-semibold">
+                        {formatCurrency(order.total)}
+                        {order.discountPercent > 0 && (
+                          <span className="ml-1 font-normal text-emerald-600">(-{order.discountPercent}%)</span>
+                        )}
+                      </td>
                       <td className="px-4 py-2 text-right">
                         <button
                           type="button"
