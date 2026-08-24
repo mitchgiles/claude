@@ -6,6 +6,8 @@ export interface Product {
   name: string;
   description: string;
   price: number;
+  minQty: number;
+  stepQty: number;
 }
 
 export interface OrderLine {
@@ -51,6 +53,8 @@ export const CATALOG: Product[] = [
     name: 'Scourr Original Cloth — Single',
     description: 'One reusable cleaning cloth',
     price: 1.25,
+    minQty: 100,
+    stepQty: 50,
   },
   {
     id: 'pack3',
@@ -58,8 +62,21 @@ export const CATALOG: Product[] = [
     name: 'Scourr Original Cloth — 3 Pack',
     description: 'Three cloths, mixed colours',
     price: 3.75,
+    minQty: 10,
+    stepQty: 10,
   },
 ];
+
+// Steps a product's cart quantity up to the next valid order amount (jumps to
+// minQty from 0, then moves in stepQty increments).
+export function incrementQty(product: Product, current: number): number {
+  return current <= 0 ? product.minQty : current + product.stepQty;
+}
+
+// Steps down; drops to 0 once below minQty rather than allowing a partial order.
+export function decrementQty(product: Product, current: number): number {
+  return current <= product.minQty ? 0 : current - product.stepQty;
+}
 
 const STORAGE_KEY = 'scourr-trade-show-orders';
 

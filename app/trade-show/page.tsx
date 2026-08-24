@@ -5,8 +5,10 @@ import { Minus, Plus, Trash2, Download, ShoppingCart, CheckCircle2, CreditCard, 
 import {
   CATALOG,
   EMPTY_ADDRESS,
+  decrementQty,
   formatCurrency,
   getOrders,
+  incrementQty,
   saveOrder,
   deleteOrder,
   downloadCsv,
@@ -181,22 +183,25 @@ export default function TradeShowPage() {
                     <p className="text-sm text-slate-500">{product.description}</p>
                     <p className="mt-1 text-xs text-slate-400">{product.sku}</p>
                     <p className="mt-2 text-lg font-bold">{formatCurrency(product.price)}</p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Min {product.minQty}, +{product.stepQty}
+                    </p>
                   </div>
                   <div className="mt-3 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
                         aria-label={`Decrease ${product.name} quantity`}
-                        onClick={() => setQty(product.id, qty - 1)}
+                        onClick={() => setQty(product.id, decrementQty(product, qty))}
                         className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 active:bg-slate-300"
                       >
                         <Minus size={18} />
                       </button>
-                      <span className="w-8 text-center text-lg font-semibold tabular-nums">{qty}</span>
+                      <span className="w-12 text-center text-lg font-semibold tabular-nums">{qty}</span>
                       <button
                         type="button"
                         aria-label={`Increase ${product.name} quantity`}
-                        onClick={() => setQty(product.id, qty + 1)}
+                        onClick={() => setQty(product.id, incrementQty(product, qty))}
                         className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-900 text-white hover:bg-slate-700 active:bg-slate-600"
                       >
                         <Plus size={18} />
