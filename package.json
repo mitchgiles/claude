@@ -9,10 +9,10 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@sendgrid/mail": "^8.1.6",
     "lucide-react": "^0.577.0",
     "next": "16.1.6",
     "next-auth": "^5.0.0-beta.30",
+    "nodemailer": "^9.0.5",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "stripe": "^22.4.0"
@@ -20,6 +20,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20.19.37",
+    "@types/nodemailer": "^8.0.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

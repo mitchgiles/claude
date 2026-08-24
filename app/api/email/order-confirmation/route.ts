@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import sgMail, { type MailDataRequired } from '@sendgrid/mail';
+import nodemailer from 'nodemailer';
 import { formatCurrency, type Order } from '@/lib/trade-show';
 
 function escapeHtml(value: string): string {
@@ -60,15 +60,15 @@ function renderOrderHtml(order: Order, audience: 'merchant' | 'customer'): strin
 }
 
 export async function POST(request: NextRequest) {
-  const apiKey = process.env.SENDGRID_API_KEY;
-  const fromEmail = process.env.SENDGRID_FROM_EMAIL;
-  const merchantEmail = process.env.MERCHANT_EMAIL;
+  const gmailUser = process.env.GMAIL_USER;
+  const gmailAppPassword = process.env.GMAIL_APP_PASSWORD;
+  const merchantEmail = process.env.MERCHANT_EMAIL || gmailUser;
 
-  if (!apiKey || !fromEmail) {
+  if (!gmailUser || !gmailAppPassword) {
     return NextResponse.json(
       {
         error:
-          'Email is not configured. Set SENDGRID_API_KEY and SENDGRID_FROM_EMAIL in the environment.',
+          'Email is not configured. Set GMAIL_USER and GMAIL_APP_PASSWORD in the environment.',
       },
       { status: 500 }
     );
@@ -79,13 +79,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Missing order.' }, { status: 400 });
   }
 
-  sgMail.setApiKey(apiKey);
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: { user: gmailUser, pass: gmailAppPassword },
+  });
 
-  const messages: MailDataRequired[] = [];
+  const messages: { to: string; subject: string; html: string }[] = [];
   if (merchantEmail) {
     messages.push({
       to: merchantEmail,
-      from: fromEmail,
       subject: `New order #${order.id} — ${formatCurrency(order.total)}`,
       html: renderOrderHtml(order, 'merchant'),
     });
@@ -93,7 +95,6 @@ export async function POST(request: NextRequest) {
   if (order.email) {
     messages.push({
       to: order.email,
-      from: fromEmail,
       subject: `Your Scourr order confirmation #${order.id}`,
       html: renderOrderHtml(order, 'customer'),
     });
@@ -104,7 +105,9 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    await Promise.all(messages.map((m) => sgMail.send(m)));
+    await Promise.all(
+      messages.map((m) => transporter.sendMail({ from: gmailUser, to: m.to, subject: m.subject, html: m.html }))
+    );
     return NextResponse.json({ sent: messages.map((m) => m.to) });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to send order confirmation email.';
