@@ -63,6 +63,10 @@ export async function POST(request: NextRequest) {
   const gmailUser = process.env.GMAIL_USER;
   const gmailAppPassword = process.env.GMAIL_APP_PASSWORD;
   const merchantEmail = process.env.MERCHANT_EMAIL || gmailUser;
+  // Custom "From" address — must be a verified "Send mail as" alias on the
+  // GMAIL_USER account (Gmail Settings > Accounts and Import), otherwise
+  // Gmail silently rewrites the From header back to gmailUser.
+  const fromEmail = process.env.GMAIL_FROM_EMAIL || gmailUser;
 
   if (!gmailUser || !gmailAppPassword) {
     return NextResponse.json(
@@ -106,7 +110,7 @@ export async function POST(request: NextRequest) {
 
   try {
     await Promise.all(
-      messages.map((m) => transporter.sendMail({ from: gmailUser, to: m.to, subject: m.subject, html: m.html }))
+      messages.map((m) => transporter.sendMail({ from: fromEmail, to: m.to, subject: m.subject, html: m.html }))
     );
     return NextResponse.json({ sent: messages.map((m) => m.to) });
   } catch (err) {
