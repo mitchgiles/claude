@@ -1,7 +1,19 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { Minus, Plus, Trash2, Download, ShoppingCart, CheckCircle2, CreditCard, ExternalLink } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  Minus,
+  Plus,
+  Trash2,
+  Download,
+  ShoppingCart,
+  CheckCircle2,
+  CreditCard,
+  ExternalLink,
+  Cloud,
+  CloudOff,
+  RefreshCw,
+} from 'lucide-react';
 import {
   applyDiscount,
   CATALOG,
@@ -10,6 +22,7 @@ import {
   formatCurrency,
   getOrders,
   incrementQty,
+  markOrderSynced,
   saveOrder,
   deleteOrder,
   downloadCsv,
@@ -41,11 +54,49 @@ export default function TradeShowPage() {
   const [confirmation, setConfirmation] = useState<string | null>(null);
   const [emailStatus, setEmailStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [emailError, setEmailError] = useState<string | null>(null);
+  const [syncingIds, setSyncingIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     // One-time hydration from localStorage; SSR has no access to it.
     setOrders(getOrders());
   }, []);
+
+  const syncOrder = useCallback(async (order: Order) => {
+    setSyncingIds((prev) => new Set(prev).add(order.id));
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order }),
+      });
+      if (!res.ok) throw new Error('sync failed');
+      setOrders(markOrderSynced(order.id));
+    } catch {
+      // Left unsynced — the retry loop (interval + online event) will pick it up.
+    } finally {
+      setSyncingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(order.id);
+        return next;
+      });
+    }
+  }, []);
+
+  const syncPendingOrders = useCallback(() => {
+    getOrders()
+      .filter((o) => !o.synced)
+      .forEach((o) => void syncOrder(o));
+  }, [syncOrder]);
+
+  useEffect(() => {
+    syncPendingOrders();
+    window.addEventListener('online', syncPendingOrders);
+    const interval = setInterval(syncPendingOrders, 30000);
+    return () => {
+      window.removeEventListener('online', syncPendingOrders);
+      clearInterval(interval);
+    };
+  }, [syncPendingOrders]);
 
   const cartLines: OrderLine[] = useMemo(
     () =>
@@ -67,7 +118,8 @@ export default function TradeShowPage() {
   const dayStats = useMemo(() => {
     const revenue = orders.reduce((sum, o) => sum + o.total, 0);
     const items = orders.reduce((sum, o) => sum + o.lines.reduce((s, l) => s + l.quantity, 0), 0);
-    return { orderCount: orders.length, revenue, items };
+    const pending = orders.filter((o) => !o.synced).length;
+    return { orderCount: orders.length, revenue, items, pending };
   }, [orders]);
 
   function setQty(productId: string, qty: number) {
@@ -158,6 +210,7 @@ export default function TradeShowPage() {
       billingSameAsShipping,
       billingAddress: billingSameAsShipping ? EMPTY_ADDRESS : billingAddress,
       stripeCheckoutUrl: stripeCheckoutUrl ?? '',
+      synced: false,
     };
 
     const updated = saveOrder(order);
@@ -165,6 +218,7 @@ export default function TradeShowPage() {
     setConfirmation(`Order #${order.id} saved — ${formatCurrency(order.total)}`);
     clearCart();
     void sendOrderEmails(order);
+    void syncOrder(order);
     setTimeout(() => setConfirmation(null), 4000);
   }
 
@@ -450,8 +504,23 @@ export default function TradeShowPage() {
         {/* Order history */}
         <section className="lg:col-span-5">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Order history</h2>
+            <h2 className="flex items-center gap-2 text-lg font-semibold">
+              Order history
+              {dayStats.pending > 0 && (
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                  {dayStats.pending} pending sync
+                </span>
+              )}
+            </h2>
             <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={syncPendingOrders}
+                disabled={dayStats.pending === 0}
+                className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300"
+              >
+                <RefreshCw size={16} /> Sync now
+              </button>
               <button
                 type="button"
                 onClick={() => downloadCsv(orders)}
@@ -483,6 +552,7 @@ export default function TradeShowPage() {
                     <th className="px-4 py-2">Items</th>
                     <th className="px-4 py-2">Payment</th>
                     <th className="px-4 py-2 text-right">Total</th>
+                    <th className="px-4 py-2">Synced</th>
                     <th className="px-4 py-2" />
                   </tr>
                 </thead>
@@ -502,6 +572,17 @@ export default function TradeShowPage() {
                         {formatCurrency(order.total)}
                         {order.discountPercent > 0 && (
                           <span className="ml-1 font-normal text-emerald-600">(-{order.discountPercent}%)</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2">
+                        {order.synced ? (
+                          <span className="flex items-center gap-1 text-emerald-600" title="Synced to Google Sheets">
+                            <Cloud size={16} /> Synced
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-amber-600" title="Not yet synced">
+                            <CloudOff size={16} /> {syncingIds.has(order.id) ? 'Syncing…' : 'Pending'}
+                          </span>
                         )}
                       </td>
                       <td className="px-4 py-2 text-right">

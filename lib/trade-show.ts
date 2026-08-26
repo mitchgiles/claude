@@ -46,6 +46,7 @@ export interface Order {
   billingSameAsShipping: boolean;
   billingAddress: Address;
   stripeCheckoutUrl: string;
+  synced: boolean;
 }
 
 // Clamps to 0-100 and rounds to the nearest penny.
@@ -114,6 +115,12 @@ export function saveOrder(order: Order): Order[] {
 
 export function deleteOrder(orderId: string): Order[] {
   const orders = getOrders().filter((o) => o.id !== orderId);
+  persist(orders);
+  return orders;
+}
+
+export function markOrderSynced(orderId: string): Order[] {
+  const orders = getOrders().map((o) => (o.id === orderId ? { ...o, synced: true } : o));
   persist(orders);
   return orders;
 }
