@@ -75,6 +75,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Missing order.' }, { status: 400 });
   }
 
+  // Diagnose key corruption without ever echoing the secret itself — the PEM
+  // markers and line count are safe to report (every RSA key has them).
+  const hasBegin = key.includes('BEGIN PRIVATE KEY');
+  const hasEnd = key.includes('END PRIVATE KEY');
+  const lineCount = key.split('\n').length;
+  if (!hasBegin || !hasEnd || lineCount < 3) {
+    return NextResponse.json(
+      {
+        error: `The resolved private key doesn't look valid (length ${key.length} chars, ${lineCount} line(s), BEGIN marker: ${hasBegin}, END marker: ${hasEnd}). It's likely the whole JSON file got pasted instead of just the private_key field, or the value is truncated/empty.`,
+      },
+      { status: 500 }
+    );
+  }
+
   try {
     const client = new JWT({
       email,
