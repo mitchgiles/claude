@@ -29,15 +29,39 @@ function orderToRow(order: Order): string[] {
   ];
 }
 
+// Accepts the key in whatever shape it survived pasting into an env var UI:
+// literal "\n" escape sequences, real newlines, or accidentally-included
+// surrounding quotes from the downloaded JSON file. GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY_B64
+// (the whole key, base64-encoded) sidesteps all of that and is the most reliable option.
+function resolvePrivateKey(): string | undefined {
+  const b64 = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY_B64;
+  if (b64) {
+    try {
+      return Buffer.from(b64.trim(), 'base64').toString('utf8');
+    } catch {
+      return undefined;
+    }
+  }
+
+  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
+  if (!raw) return undefined;
+
+  let key = raw.trim();
+  if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
+    key = key.slice(1, -1);
+  }
+  return key.replace(/\\n/g, '\n');
+}
+
 export async function POST(request: NextRequest) {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const rawKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY;
+  const key = resolvePrivateKey();
   const sheetId = process.env.GOOGLE_SHEET_ID;
 
-  if (!email || !rawKey || !sheetId) {
+  if (!email || !key || !sheetId) {
     const missing = [
       !email && 'GOOGLE_SERVICE_ACCOUNT_EMAIL',
-      !rawKey && 'GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY',
+      !key && 'GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY (or GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY_B64)',
       !sheetId && 'GOOGLE_SHEET_ID',
     ].filter(Boolean);
     return NextResponse.json(
@@ -54,7 +78,7 @@ export async function POST(request: NextRequest) {
   try {
     const client = new JWT({
       email,
-      key: rawKey.replace(/\\n/g, '\n'),
+      key,
       scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     });
 
