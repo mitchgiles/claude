@@ -53,10 +53,30 @@ function resolvePrivateKey(): string | undefined {
   return key.replace(/\\n/g, '\n');
 }
 
+// Strips surrounding quotes/whitespace, and pulls the ID out if the whole sheet
+// URL got pasted instead of just its ID segment — the same class of mistake as
+// the private key field.
+function resolveSheetId(): string | undefined {
+  const raw = process.env.GOOGLE_SHEET_ID;
+  if (!raw) return undefined;
+
+  let id = raw.trim();
+  if ((id.startsWith('"') && id.endsWith('"')) || (id.startsWith("'") && id.endsWith("'"))) {
+    id = id.slice(1, -1).trim();
+  }
+
+  const urlMatch = id.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/);
+  if (urlMatch) {
+    id = urlMatch[1];
+  }
+
+  return id;
+}
+
 export async function POST(request: NextRequest) {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   const key = resolvePrivateKey();
-  const sheetId = process.env.GOOGLE_SHEET_ID;
+  const sheetId = resolveSheetId();
 
   if (!email || !key || !sheetId) {
     const missing = [
@@ -66,6 +86,15 @@ export async function POST(request: NextRequest) {
     ].filter(Boolean);
     return NextResponse.json(
       { error: `Google Sheets sync is not configured. Missing: ${missing.join(', ')}.` },
+      { status: 500 }
+    );
+  }
+
+  if (!/^[a-zA-Z0-9_-]{20,}$/.test(sheetId)) {
+    return NextResponse.json(
+      {
+        error: `GOOGLE_SHEET_ID doesn't look like a valid spreadsheet ID (got "${sheetId}", ${sheetId.length} chars). It should be only the ID segment from the sheet's URL — a long string of letters/numbers/underscores/hyphens with no slashes, spaces, or quotes.`,
+      },
       { status: 500 }
     );
   }
@@ -96,7 +125,9 @@ export async function POST(request: NextRequest) {
       scopes: ['https://www.googleapis.com/auth/spreadsheets'],
     });
 
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${encodeURIComponent(
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(
+      sheetId
+    )}/values/${encodeURIComponent(
       SHEET_RANGE
     )}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
 
@@ -109,10 +140,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch (err) {
     let message = err instanceof Error ? err.message : 'Failed to sync order to Google Sheets.';
+    // gaxios (used by google-auth-library) attaches the HTTP response; surface its
+    // status so "not found" vs "permission denied" vs other failures are distinguishable.
+    const status = (err as { response?: { status?: number } })?.response?.status;
     // Google returns an HTML "file not found" page (not JSON) when the sheet ID is wrong,
     // which otherwise surfaces as a wall of unreadable markup.
     if (/^\s*<!DOCTYPE html/i.test(message) || /<title>Page Not Found<\/title>/i.test(message)) {
-      message = `Google Sheets couldn't find the spreadsheet. Check that GOOGLE_SHEET_ID is set to just the ID segment from the sheet's URL (https://docs.google.com/spreadsheets/d/THIS_PART/edit), not the full URL, and that the sheet hasn't been deleted.`;
+      message =
+        status === 403
+          ? `Google Sheets denied access to spreadsheet ID "${sheetId}". Share the sheet (Editor access) with the service account email in GOOGLE_SERVICE_ACCOUNT_EMAIL.`
+          : `Google Sheets couldn't find spreadsheet ID "${sheetId}" (HTTP ${status ?? 'unknown'}). Double-check it against the sheet's URL (https://docs.google.com/spreadsheets/d/THIS_PART/edit) and that the sheet hasn't been deleted.`;
     }
     return NextResponse.json({ error: message }, { status: 502 });
   }
