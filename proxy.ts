@@ -11,7 +11,13 @@ function unauthorized() {
 // TRADE_SHOW_PASSWORD is set. Left unset, the app is publicly accessible as before.
 export function proxy(req: NextRequest) {
   const password = process.env.TRADE_SHOW_PASSWORD?.trim();
-  if (!password) return NextResponse.next();
+  // TEMPORARY diagnostic header — confirms the proxy ran and whether it saw a
+  // password configured, without leaking the value. Remove once auth works.
+  if (!password) {
+    const res = NextResponse.next();
+    res.headers.set('x-proxy-debug', 'ran-no-password-configured');
+    return res;
+  }
 
   const auth = req.headers.get('authorization');
   if (!auth?.startsWith('Basic ')) return unauthorized();
@@ -20,7 +26,9 @@ export function proxy(req: NextRequest) {
   const suppliedPassword = decoded.slice(decoded.indexOf(':') + 1);
   if (suppliedPassword !== password) return unauthorized();
 
-  return NextResponse.next();
+  const res = NextResponse.next();
+  res.headers.set('x-proxy-debug', 'ran-authorized');
+  return res;
 }
 
 export const config = {
