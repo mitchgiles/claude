@@ -1,84 +1,41 @@
-# SpinSync — Spotify Spin Class Generator
+# Scourr — Trade Show Orders
 
-Generate personalized indoor cycling workouts from your Spotify playlists. SpinSync uses Spotify's Audio Features API to analyze BPM, energy, danceability, and valence for every track, then maps each song to a spin class segment (warmup, sprint, climb, intervals, recovery, cooldown).
+An order-taking app for Scourr reusable cleaning cloths, built for use at in-person trade shows. Staff add items to a cart, capture optional customer details, and record the order — all backed by `localStorage` so it keeps working without a network connection at the venue.
 
 ## Features
 
-- **Spotify OAuth** — secure login via Spotify's authorization flow
-- **Playlist browser** — browse all your saved and followed playlists
-- **Audio analysis** — fetches tempo, energy, danceability, and valence for every track
-- **Smart workout generation** — classifies each track into an intensity tier:
-  - Warm Up · Steady State · Seated Climb · Intervals · Standing Climb · Sprint · Recovery · Cool Down
-- **Visual timeline** — interactive heatmap of the full workout with hover tooltips
-- **Live timer** — start the workout and follow along with live segment callouts
-- **Stats** — avg BPM, avg energy, estimated calories, and more
+- **Product catalog** — quantity steppers with per-product minimum and step amounts (`lib/trade-show.ts`)
+- **Cart & checkout** — customer details, shipping/billing addresses, payment method, discounts
+- **Offline-first** — orders persist to `localStorage`, with an order history table and CSV export for post-show follow-up
+- **Stripe Checkout** — optional card payment via `/api/stripe/checkout`
+- **Order sync** — orders can sync to a Google Sheet (`/api/orders`) and trigger confirmation emails (`/api/email/order-confirmation`)
 
 ## Tech Stack
 
 - **Next.js 16** (App Router, TypeScript)
 - **Tailwind CSS v4**
-- **Spotify Web API** — OAuth 2.0 + Audio Features
 
 ## Setup
-
-### 1. Create a Spotify App
-
-1. Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
-2. Create a new app
-3. Add `http://127.0.0.1:3000/api/auth/callback` as a Redirect URI
-   > Spotify's dashboard rejects `localhost` — use `127.0.0.1` instead
-4. Copy your **Client ID** and **Client Secret**
-
-### 2. Configure Environment
-
-Create a `.env.local` file in the project root:
-
-```env
-SPOTIFY_CLIENT_ID=your_spotify_client_id
-SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
-NEXTAUTH_URL=http://127.0.0.1:3000
-NEXTAUTH_SECRET=any_random_secret_string
-SPOTIFY_REDIRECT_URI=http://127.0.0.1:3000/api/auth/callback
-```
-
-> For Vercel, set `NEXTAUTH_URL` to your deployment URL and `SPOTIFY_REDIRECT_URI` to `https://your-app.vercel.app/api/auth/callback`. The value must exactly match what is registered in the Spotify dashboard.
-
-### 3. Install and Run
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) and click **Connect with Spotify**.
+Open [http://localhost:3000](http://localhost:3000) — it redirects straight to `/trade-show`.
 
-## How It Works
+### Environment variables
 
-```
-Spotify Playlist
-       ↓
-GET /api/spotify/tracks      — fetch track metadata
-       ↓
-GET /api/spotify/features    — fetch audio features (BPM, energy, etc.)
-       ↓
-workout-generator.ts          — classify intensity per track
-       ↓
-SpinClass object              — timeline, instructions, resistance & cadence cues
-```
-
-### Intensity Classification
-
-| Intensity       | Tempo        | Energy    | Notes                        |
-|-----------------|--------------|-----------|------------------------------|
-| Sprint          | > 145 BPM    | > 0.85    | Max effort, fast legs        |
-| Standing Climb  | 125–145 BPM  | > 0.75    | Out of saddle, high resistance |
-| Intervals       | any          | > 0.7     | High danceability            |
-| Seated Climb    | 115–135 BPM  | 0.55–0.80 | Stay seated, moderate climb  |
-| Steady State    | 110–130 BPM  | 0.40–0.65 | Consistent pace              |
-| Recovery        | any          | < 0.45    | Catch your breath            |
-| Warm Up         | first track  | —         | Positional override          |
-| Cool Down       | last track   | —         | Positional override          |
+| Variable | Used for |
+|---|---|
+| `GOOGLE_SERVICE_ACCOUNT_EMAIL` | Google Sheets order sync |
+| `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY_B64` (preferred) or `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` | Google Sheets order sync |
+| `GOOGLE_SHEET_ID` | Google Sheets order sync — the ID segment from the sheet's URL |
+| `GMAIL_USER`, `GMAIL_APP_PASSWORD` | Order confirmation emails |
+| `MERCHANT_EMAIL` (optional) | Where merchant order notifications are sent (defaults to `GMAIL_USER`) |
+| `GMAIL_FROM_EMAIL` (optional) | Custom "From" address, must be a verified alias on `GMAIL_USER` |
+| `STRIPE_SECRET_KEY` | Stripe Checkout |
 
 ## Deployment
 
-Deploy to [Vercel](https://vercel.com) with the environment variables set in project settings. Update `NEXTAUTH_URL` to your production URL and add the production callback URL to your Spotify app's Redirect URIs.
+Deploy to [Vercel](https://vercel.com) with the environment variables above set in project settings.

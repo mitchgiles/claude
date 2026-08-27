@@ -2,9 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'SpinSync — Spotify Spin Class Generator',
-  description:
-    'Generate personalized spin class workouts from your Spotify playlists using audio analysis.',
+  title: 'Scourr — Trade Show Orders',
+  description: 'Order-taking app for Scourr reusable cleaning cloths at trade shows.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
