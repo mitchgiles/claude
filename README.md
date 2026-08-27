@@ -35,6 +35,7 @@ Open [http://localhost:3000](http://localhost:3000) — it redirects straight to
 | `MERCHANT_EMAIL` (optional) | Where merchant order notifications are sent (defaults to `GMAIL_USER`) |
 | `GMAIL_FROM_EMAIL` (optional) | Custom "From" address, must be a verified alias on `GMAIL_USER` |
 | `STRIPE_SECRET_KEY` | Stripe Checkout |
+| `TRADE_SHOW_PASSWORD` (optional) | Gates the whole app behind a single shared password (HTTP Basic Auth). Unset = publicly accessible. |
 
 ## Deployment
 
