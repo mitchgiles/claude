@@ -108,7 +108,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to sync order to Google Sheets.';
+    let message = err instanceof Error ? err.message : 'Failed to sync order to Google Sheets.';
+    // Google returns an HTML "file not found" page (not JSON) when the sheet ID is wrong,
+    // which otherwise surfaces as a wall of unreadable markup.
+    if (/^\s*<!DOCTYPE html/i.test(message) || /<title>Page Not Found<\/title>/i.test(message)) {
+      message = `Google Sheets couldn't find the spreadsheet. Check that GOOGLE_SHEET_ID is set to just the ID segment from the sheet's URL (https://docs.google.com/spreadsheets/d/THIS_PART/edit), not the full URL, and that the sheet hasn't been deleted.`;
+    }
     return NextResponse.json({ error: message }, { status: 502 });
   }
 }
