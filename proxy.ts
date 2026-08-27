@@ -10,7 +10,7 @@ function unauthorized() {
 // Gates the whole app behind a single shared password (HTTP Basic Auth) when
 // TRADE_SHOW_PASSWORD is set. Left unset, the app is publicly accessible as before.
 export function proxy(req: NextRequest) {
-  const password = process.env.TRADE_SHOW_PASSWORD;
+  const password = process.env.TRADE_SHOW_PASSWORD?.trim();
   if (!password) return NextResponse.next();
 
   const auth = req.headers.get('authorization');
