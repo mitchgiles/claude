@@ -55,6 +55,7 @@ export default function TradeShowPage() {
   const [emailStatus, setEmailStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [emailError, setEmailError] = useState<string | null>(null);
   const [syncingIds, setSyncingIds] = useState<Set<string>>(new Set());
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   useEffect(() => {
     // One-time hydration from localStorage; SSR has no access to it.
@@ -69,10 +70,13 @@ export default function TradeShowPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ order }),
       });
-      if (!res.ok) throw new Error('sync failed');
+      const data = await res.json().catch(() => ({}) as { error?: string });
+      if (!res.ok) throw new Error(data.error || `Sync failed (HTTP ${res.status})`);
       setOrders(markOrderSynced(order.id));
-    } catch {
+      setSyncError(null);
+    } catch (err) {
       // Left unsynced — the retry loop (interval + online event) will pick it up.
+      setSyncError(err instanceof Error ? err.message : 'Failed to sync order to Google Sheets.');
     } finally {
       setSyncingIds((prev) => {
         const next = new Set(prev);
@@ -539,6 +543,12 @@ export default function TradeShowPage() {
               </button>
             </div>
           </div>
+
+          {syncError && (
+            <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+              Google Sheets sync error: {syncError}
+            </p>
+          )}
 
           {orders.length === 0 ? (
             <p className="text-sm text-slate-400">No orders saved yet.</p>
