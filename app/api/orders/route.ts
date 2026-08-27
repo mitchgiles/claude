@@ -35,11 +35,13 @@ export async function POST(request: NextRequest) {
   const sheetId = process.env.GOOGLE_SHEET_ID;
 
   if (!email || !rawKey || !sheetId) {
+    const missing = [
+      !email && 'GOOGLE_SERVICE_ACCOUNT_EMAIL',
+      !rawKey && 'GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY',
+      !sheetId && 'GOOGLE_SHEET_ID',
+    ].filter(Boolean);
     return NextResponse.json(
-      {
-        error:
-          'Google Sheets sync is not configured. Set GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY, and GOOGLE_SHEET_ID.',
-      },
+      { error: `Google Sheets sync is not configured. Missing: ${missing.join(', ')}.` },
       { status: 500 }
     );
   }
