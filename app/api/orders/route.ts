@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { JWT } from 'google-auth-library';
 import type { Address, Order } from '@/lib/trade-show';
 
-const SHEET_RANGE = 'Orders!A:O';
+const SHEET_RANGE = 'Sheet1!A:O';
 
 function addressLine(a: Address): string {
   return [a.line1, a.line2, a.city, a.postcode].filter(Boolean).join(', ');
