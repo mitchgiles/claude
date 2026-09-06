@@ -49,6 +49,9 @@ export default function TradeShowPage() {
   const [billingAddress, setBillingAddress] = useState<Address>(EMPTY_ADDRESS);
   const [orderRef, setOrderRef] = useState<string | null>(null);
   const [stripeCheckoutUrl, setStripeCheckoutUrl] = useState<string | null>(null);
+  // Survives clearCart() (unlike stripeCheckoutUrl) so the fallback link below
+  // still works if the popup was blocked, even after the order finalizes.
+  const [lastCheckoutUrl, setLastCheckoutUrl] = useState<string | null>(null);
   const [stripeLoading, setStripeLoading] = useState(false);
   const [stripeError, setStripeError] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<string | null>(null);
@@ -167,8 +170,13 @@ export default function TradeShowPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to create Stripe checkout link.');
-      setStripeCheckoutUrl(data.url);
+      setLastCheckoutUrl(data.url);
       window.open(data.url, '_blank', 'noopener,noreferrer');
+      // The Stripe checkout page opens in a separate tab with no access to this
+      // page's state, so there's no reliable way to detect payment completion
+      // here — finalize (save/sync/email) immediately, same as Cash/Invoice orders
+      // are recorded on "Complete order" without waiting for settlement.
+      finalizeOrder(ref, data.url);
     } catch (err) {
       setStripeError(err instanceof Error ? err.message : 'Failed to create Stripe checkout link.');
     } finally {
@@ -194,11 +202,11 @@ export default function TradeShowPage() {
     }
   }
 
-  function completeOrder() {
+  function finalizeOrder(orderId: string, checkoutUrl: string) {
     if (cartLines.length === 0) return;
 
     const order: Order = {
-      id: orderRef ?? crypto.randomUUID().slice(0, 8),
+      id: orderId,
       createdAt: new Date().toLocaleString('en-GB'),
       customerName: customerName.trim() || 'Walk-in',
       company: company.trim(),
@@ -213,7 +221,7 @@ export default function TradeShowPage() {
       shippingAddress,
       billingSameAsShipping,
       billingAddress: billingSameAsShipping ? EMPTY_ADDRESS : billingAddress,
-      stripeCheckoutUrl: stripeCheckoutUrl ?? '',
+      stripeCheckoutUrl: checkoutUrl,
       synced: false,
     };
 
@@ -224,6 +232,10 @@ export default function TradeShowPage() {
     void sendOrderEmails(order);
     void syncOrder(order);
     setTimeout(() => setConfirmation(null), 4000);
+  }
+
+  function completeOrder() {
+    finalizeOrder(orderRef ?? crypto.randomUUID().slice(0, 8), stripeCheckoutUrl ?? '');
   }
 
   function handleDeleteOrder(id: string) {
@@ -434,16 +446,16 @@ export default function TradeShowPage() {
                     className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white py-2.5 text-sm font-semibold hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-300"
                   >
                     <CreditCard size={16} />
-                    {stripeLoading ? 'Creating Stripe checkout…' : 'Get Stripe payment link'}
+                    {stripeLoading ? 'Creating Stripe checkout…' : 'Charge card & save order'}
                   </button>
-                  {stripeCheckoutUrl && (
+                  {lastCheckoutUrl && (
                     <a
-                      href={stripeCheckoutUrl}
+                      href={lastCheckoutUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="mt-2 flex items-center justify-center gap-1 text-sm font-medium text-emerald-700 hover:underline"
                     >
-                      Open Stripe checkout <ExternalLink size={14} />
+                      Reopen Stripe checkout <ExternalLink size={14} />
                     </a>
                   )}
                   {stripeError && <p className="mt-2 text-sm text-red-600">{stripeError}</p>}
