@@ -63,7 +63,7 @@ export const CATALOG: Product[] = [
     description: 'One reusable cleaning cloth',
     price: 1.25,
     minQty: 100,
-    stepQty: 50,
+    stepQty: 10,
   },
   {
     id: 'pack3',
